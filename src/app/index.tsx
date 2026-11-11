@@ -21,7 +21,7 @@ import { UserProfile } from "../types";
 
 // false = Bypass MATI (halaman login selalu tampil untuk screenshot/demo)
 // true  = Bypass AKTIF (otomatis loncat ke Home jika token aktif)
-const ENABLE_AUTO_BYPASS = true;
+const ENABLE_AUTO_BYPASS = false;
 
 WebBrowser.maybeCompleteAuthSession();
 
