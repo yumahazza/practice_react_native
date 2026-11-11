@@ -1,123 +1,52 @@
-# 🛒 Laptop Catalog — Online Shop App
+# Aplikasi Firebase Mahasiswa
 
-Aplikasi toko online sederhana berbasis **React Native** dan **Expo** yang dirancang untuk menampilkan katalog produk laptop interaktif. Dokumen ini dibuat sebagai panduan serta laporan tugas praktikum pengembangan aplikasi perangkat bergerak (*mobile application development*).
+Aplikasi React Native dengan Expo Router untuk login Google melalui Firebase Authentication serta melihat dan mengelola daftar mahasiswa di Cloud Firestore.
 
----
+## Fitur
 
-## 📋 Daftar Isi
+1. Login Google menggunakan ID token dan Firebase Authentication.
+2. Sesi Firebase dipulihkan pada perangkat; ID token dan profil juga disimpan di AsyncStorage.
+3. Halaman login dilewati hanya jika Firebase memulihkan pengguna yang masih login. Token lokal lama saja tidak cukup.
+4. Data mahasiswa ditambah dan dihapus dari koleksi Cloud Firestore `mahasiswa`.
+5. Beranda menampilkan daftar mahasiswa secara realtime dari Cloud Firestore.
 
-- [Tentang Proyek](#-tentang-proyek)
-- [Fitur Utama](#-fitur-utama)
-- [Teknologi & Fitur Teknis](#-teknologi--fitur-teknis)
-- [Struktur Direktori](#-struktur-direktori)
-- [Prasyarat Sistem](#-prasyarat-sistem)
-- [Panduan Instalasi & Penggunaan](#-panduan-instalasi--penggunaan)
-- [Panduan Pengujian](#-panduan-pengujian)
+## Konfigurasi Firebase dan Google
 
----
+1. Buat project di [Firebase Console](https://console.firebase.google.com/), tambahkan aplikasi Web, lalu salin konfigurasi Firebase.
+2. Aktifkan **Authentication > Sign-in method > Google**.
+3. Buat database melalui **Firestore Database**. Aplikasi menggunakan koleksi `mahasiswa` dengan field `nim`, `nama`, `jurusan`, `angkatan`, dan `createdAt`.
+4. Buat file `.env` di direktori proyek berdasarkan `.env.example`, lalu isi kredensial Firebase dan Google OAuth Client ID yang sesuai. File `.env` tidak boleh dimasukkan ke Git.
+5. Pastikan aturan Firestore hanya mengizinkan pengguna yang terautentikasi membaca dan menulis koleksi. Contoh aturan awal:
 
-## 📖 Tentang Proyek
+   ```text
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /mahasiswa/{document} {
+         allow read, write: if request.auth != null;
+       }
+     }
+   }
+   ```
 
-Proyek ini merupakan antarmuka (*user interface*) toko online sederhana yang berfokus pada teknik **layouting modern** dan **penanganan state (*state management*)** di React Native. 
+6. Setelah mengubah `.env`, mulai ulang server Expo agar variabel konfigurasi dimuat.
 
-Aplikasi memulai halaman utama dengan tampilan yang minimalis (*headline* dan deskripsi ringkas). Ketika pengguna menekan tombol **"Lihat Laptop"**, aplikasi secara interaktif memuat daftar katalog gambar produk secara horizontal (*flex-row*) yang mendukung navigasi geser (*scrolling*).
+Google OAuth memerlukan konfigurasi OAuth Client ID untuk platform yang digunakan. Aplikasi menggunakan skema `layoutsimple` yang sudah didefinisikan di `app.json`. OAuth redirect perlu diuji dengan development build; Expo Go tidak mendukung konfigurasi redirect OAuth khusus aplikasi.
 
----
+## Menjalankan aplikasi
 
-## ✨ Fitur Utama
-
-1. **Tampilan Minimalis Landing Page**: Menampilkan judul dan subjudul informasi toko sebelum produk dimuat.
-2. **Katalog Interaktif (Conditional Rendering)**: Gambar produk hanya dimuat dan ditampilkan setelah pengguna melakukan aksi menekan tombol.
-3. **Layouting Horizontal (*Flexbox & ScrollView*)**: Menyusun aset gambar secara mendatar (`flexDirection: "row"`) yang aman dan rapi untuk berbagai ukuran layar.
-4. **Responsif & Universal**: Dapat dijalankan di platform Android, iOS, maupun Web Browser.
-
----
-
-## 🛠️ Teknologi & Fitur Teknis
-
-- **Framework**: [React Native](https://reactnative.dev/) (versi Expo SDK terbaru)
-- **Bahasa Pemrograman**: TypeScript (`.tsx`)
-- **Router**: Expo Router (File-based routing)
-- **Komponen Utilitas**:
-  - `useState`: Mengelola status visibilitas katalog gambar.
-  - `ScrollView`: Menyediakan fitur pergeseran (*scrolling*) horizontal tanpa terpotong.
-  - `StyleSheet`: Mengatur tata letak Flexbox, *border-radius*, *gap*, dan ukuran elemen visual.
-  - `Image`: Memuat aset produk gambar format `.webp` / `.png` dari penyimpanan lokal proyek.
-
----
-
-## 📁 Struktur Direktori
-
-```text
-.
-├── app/
-│   ├── _layout.tsx         # Tata letak utama / konfigurasi navigator
-│   └── index.tsx           # Halaman utama aplikasi (Katalog Laptop)
-├── assets/
-│   └── images/             # Folder aset gambar produk
-│       ├── laptop1.webp
-│       ├── laptop2.webp
-│       └── laptop3.webp
-├── node_modules/           # Dependensi proyek
-├── .gitignore
-├── app.json                # Konfigurasi Expo
-├── package.json            # Daftar paket & skrip npx/npm
-├── tsconfig.json           # Konfigurasi TypeScript
-└── README.md               # Dokumentasi proyek
-```
-
----
-
-## 💻 Prasyarat Sistem
-
-Sebelum menjalankan proyek ini, pastikan perangkat komputer Anda telah terpasang software berikut:
-
-- **Node.js** (Versi LTS yang direkomendasikan, v18 atau lebih baru)
-- **npm** (Bawaan Node.js) atau **yarn**
-- **Expo Go App** (Diunduh melalui Play Store / App Store pada smartphone jika ingin uji coba langsung di HP)
-
----
-
-## 🚀 Panduan Instalasi & Penggunaan
-
-Ikuti langkah-langkah di bawah ini untuk menjalankan proyek di lingkungan lokal Anda:
-
-### 1. Clone atau Unduh Proyek
-Buka terminal/command prompt, lalu masuk ke direktori proyek:
-```bash
-cd nama-folder-proyek
-```
-
-### 2. Instalasi Dependensi
-Jalankan perintah berikut untuk mengunduh seluruh library yang dibutuhkan:
 ```bash
 npm install
+npx expo run:android
 ```
 
-### 3. Jalankan Development Server
-Mulai server pengembang Expo:
+Perintah tersebut membuat dan menjalankan development build Android. Untuk menjalankan server setelah build tersedia, gunakan `npx expo start --dev-client`. Di macOS, gunakan `npx expo run:ios`; untuk web, gunakan `npx expo start --web`. Expo Go tidak dapat menyelesaikan OAuth redirect aplikasi ini.
+
+Setiap data yang ditambahkan dari beranda disimpan ke Firestore dan akan muncul pada daftar realtime.
+
+## Pemeriksaan
+
 ```bash
-npx expo start
+npx expo lint
+npx tsc --noEmit
 ```
-
----
-
-## 📱 Panduan Pengujian
-
-Setelah perintah `npx expo start` dijalankan, terminal akan menampilkan **QR Code** beserta beberapa pilihan perintah interaktif:
-
-- **Menguji di HP Fisik**: 
-  1. Buka aplikasi **Expo Go** di ponsel Anda.
-  2. Scan QR Code yang muncul di terminal.
-  3. Pastikan HP dan Laptop terhubung di jaringan Wi-Fi yang sama.
-
-- **Menguji di Web Browser**: 
-  - Tekan tombol **`w`** di terminal untuk membuka aplikasi langsung pada browser web.
-
-- **Menguji di Emulator Android / iOS**:
-  - Tekan **`a`** untuk membuka Android Emulator (perlu Android Studio).
-  - Tekan **`i`** untuk membuka iOS Simulator (perlu Xcode & macOS).
-
----
-
-*Dokumentasi ini dibuat untuk melengkapi tugas praktikum pemrograman React Native.*

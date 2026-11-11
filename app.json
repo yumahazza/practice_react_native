@@ -21,7 +21,7 @@
       "package": "com.yumahazza.layoutsimple"
     },
     "web": {
-      "output": "server",
+      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
