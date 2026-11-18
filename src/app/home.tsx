@@ -1,19 +1,20 @@
 import { useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
 import { ComponentRef, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth } from "../config/firebaseConfig";
+import { AppShellHeader } from "../components/AppShellHeader";
 import {
   COLORS,
   FONTS,
@@ -21,36 +22,63 @@ import {
   RADIUS,
   SPACING,
   WEB_POINTER,
+  retroOffset,
 } from "../constants/theme";
-import { clearAuthSession, getAuthSession } from "../services/authStorage";
+import { getAuthSession } from "../services/authStorage";
 import {
   addMahasiswa,
   deduplicateMahasiswa,
   deleteMahasiswa,
   subscribeMahasiswaList,
+  updateMahasiswa,
 } from "../services/mahasiswaService";
 import { Mahasiswa, UserProfile } from "../types";
 
-type ActiveHomeField = "nim" | "angkatan" | "nama" | "jurusan" | null;
+type FormField = "nama" | "nim" | "angkatan" | "jurusan";
+
+interface FieldErrors {
+  nama?: string;
+  nim?: string;
+  angkatan?: string;
+  jurusan?: string;
+}
+
+interface FeedbackBanner {
+  type: "success" | "info";
+  message: string;
+}
 
 export default function HomePage() {
   const router = useRouter();
-  const angkatanRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 880;
+  const isCompactMobile = width < 560;
+
+  const scrollViewRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const namaRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const nimRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const angkatanRef = useRef<ComponentRef<typeof TextInput>>(null);
   const jurusanRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [mahasiswaList, setMahasiswaList] = useState<Mahasiswa[]>([]);
 
-  // Form input state
-  const [nim, setNim] = useState("");
+  // CRUD Form State
   const [nama, setNama] = useState("");
-  const [jurusan, setJurusan] = useState("");
+  const [nim, setNim] = useState("");
   const [angkatan, setAngkatan] = useState("");
-  const [focusedField, setFocusedField] = useState<ActiveHomeField>(null);
+  const [jurusan, setJurusan] = useState("");
+  const [focusedField, setFocusedField] = useState<FormField | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+
+  // Edit & Delete State
+  const [editingStudent, setEditingStudent] = useState<Mahasiswa | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Mahasiswa | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackBanner | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -91,68 +119,180 @@ export default function HomePage() {
     };
   }, [sessionReady]);
 
-  const handleLogout = () => {
-    try {
-      if (typeof window !== "undefined" && window.localStorage) {
-        window.localStorage.clear();
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
       }
-    } catch {}
+    };
+  }, []);
 
-    clearAuthSession().catch(() => {});
+  const showFeedback = (type: FeedbackBanner["type"], message: string) => {
+    setFeedback({ type, message });
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedback(null);
+    }, 4500);
+  };
 
-    try {
-      signOut(auth).catch(() => {});
-    } catch {}
+  const resetForm = () => {
+    setEditingStudent(null);
+    setNama("");
+    setNim("");
+    setAngkatan("");
+    setJurusan("");
+    setFieldErrors({});
+  };
 
-    if (Platform.OS === "web") {
-      window.location.href = "/";
+  const validateForm = (): FieldErrors => {
+    const errors: FieldErrors = {};
+    const cleanNama = nama.trim();
+    const cleanNim = nim.trim();
+    const cleanAngkatan = angkatan.trim();
+    const cleanJurusan = jurusan.trim();
+
+    if (!cleanNama) {
+      errors.nama = "Nama mahasiswa wajib diisi.";
+    } else if (cleanNama.length < 2) {
+      errors.nama = "Nama mahasiswa minimal 2 karakter.";
+    }
+
+    if (!cleanNim) {
+      errors.nim = "NIM wajib diisi.";
+    } else if (!/^\d+$/.test(cleanNim)) {
+      errors.nim = "NIM hanya boleh berisi angka.";
+    } else if (cleanNim.length < 6 || cleanNim.length > 15) {
+      errors.nim = "NIM harus terdiri dari 6 sampai 15 digit.";
     } else {
-      router.replace("/" as any);
+      const duplicateNim = mahasiswaList.some((m) => {
+        const isSelf =
+          editingStudent &&
+          (m.id === editingStudent.id || m.nim.trim() === editingStudent.nim.trim());
+        return !isSelf && m.nim.trim() === cleanNim;
+      });
+      if (duplicateNim) {
+        errors.nim = `NIM ${cleanNim} sudah terdaftar pada mahasiswa lain.`;
+      }
+    }
+
+    if (!cleanAngkatan) {
+      errors.angkatan = "Tahun angkatan wajib diisi.";
+    } else if (!/^\d{4}$/.test(cleanAngkatan)) {
+      errors.angkatan = "Angkatan harus berupa 4 digit tahun (mis. 2024).";
+    } else {
+      const yearNum = Number(cleanAngkatan);
+      if (yearNum < 1990 || yearNum > 2030) {
+        errors.angkatan = "Tahun angkatan harus di antara 1990 hingga 2030.";
+      }
+    }
+
+    if (!cleanJurusan) {
+      errors.jurusan = "Jurusan wajib diisi.";
+    } else if (cleanJurusan.length < 2) {
+      errors.jurusan = "Jurusan minimal 2 karakter.";
+    }
+
+    return errors;
+  };
+
+  const clearSingleFieldError = (field: FormField) => {
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
-  const handleAdd = async () => {
+  const handleSubmitForm = async () => {
     if (submitting) return;
 
-    if (!nim.trim() || !nama.trim() || !jurusan.trim() || !angkatan.trim()) {
-      setFormError("Lengkapi NIM, angkatan, nama lengkap, dan jurusan terlebih dahulu.");
+    const errors = validateForm();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
     setSubmitting(true);
-    setFormError(null);
+    const payload = {
+      nama: nama.trim(),
+      nim: nim.trim(),
+      angkatan: angkatan.trim(),
+      jurusan: jurusan.trim(),
+    };
 
     try {
-      const added = await addMahasiswa({
-        nim: nim.trim(),
-        nama: nama.trim(),
-        jurusan: jurusan.trim(),
-        angkatan: angkatan.trim(),
-      });
+      if (editingStudent) {
+        const originalId = editingStudent.id || editingStudent.nim;
+        const originalNim = editingStudent.nim;
+        const updated = await updateMahasiswa(originalId, originalNim, payload);
 
-      setMahasiswaList((prev) => deduplicateMahasiswa([added, ...prev]));
+        setMahasiswaList((prev) =>
+          deduplicateMahasiswa(
+            prev.map((m) =>
+              m.id === originalId || m.nim === originalNim ? updated : m
+            )
+          )
+        );
 
-      setNim("");
-      setNama("");
-      setJurusan("");
-      setAngkatan("");
+        resetForm();
+        showFeedback("success", `Data ${updated.nama} berhasil diperbarui.`);
+      } else {
+        const added = await addMahasiswa(payload);
+        setMahasiswaList((prev) => deduplicateMahasiswa([added, ...prev]));
+        resetForm();
+        showFeedback("success", `${added.nama} ditambahkan ke daftar.`);
+      }
     } catch (err: any) {
-      setFormError(err?.message || "Gagal menyimpan data mahasiswa.");
+      setFieldErrors({
+        nama: err?.message || "Gagal menyimpan data mahasiswa.",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id?: string, studentNim?: string) => {
-    if (!id) return;
-    await deleteMahasiswa(id, studentNim);
-    setMahasiswaList((prev) =>
-      prev.filter(
-        (m) =>
-          m.id !== id &&
-          (!studentNim || String(m.nim).trim() !== String(studentNim).trim())
-      )
-    );
+  const handleStartEdit = (student: Mahasiswa) => {
+    setEditingStudent(student);
+    setNama(student.nama || "");
+    setNim(student.nim || "");
+    setAngkatan(student.angkatan || "");
+    setJurusan(student.jurusan || "");
+    setFieldErrors({});
+    setFeedback(null);
+
+    if (!isDesktop) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }
+    setTimeout(() => {
+      namaRef.current?.focus();
+    }, 120);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+
+    const target = pendingDelete;
+    const targetId = target.id || target.nim;
+
+    try {
+      await deleteMahasiswa(targetId, target.nim);
+      setMahasiswaList((prev) =>
+        prev.filter((m) => m.id !== targetId && m.nim !== target.nim)
+      );
+
+      if (
+        editingStudent &&
+        (editingStudent.id === targetId || editingStudent.nim === target.nim)
+      ) {
+        resetForm();
+      }
+
+      setPendingDelete(null);
+      showFeedback("info", `${target.nama} telah dihapus dari daftar.`);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (!sessionReady) {
@@ -166,188 +306,8 @@ export default function HomePage() {
     );
   }
 
-  const providerLabel = user?.providerId === "google.com" ? "Google" : "Manual";
   const cleanStudents = deduplicateMahasiswa(mahasiswaList);
-
-  const renderHeader = () => (
-    <View style={styles.headerWrapper}>
-      {/* Sapaan & Identitas Pengguna */}
-      <View style={styles.topBar}>
-        <View style={styles.identityBlock}>
-          <View style={styles.statusLine}>
-            <View style={styles.statusDotPrimary} />
-            <Text style={styles.statusText}>Sesi aktif · {providerLabel}</Text>
-            {user?.role ? (
-              <>
-                <Text style={styles.statusSeparator}>/</Text>
-                <View style={styles.statusDotHighlight} />
-                <Text style={styles.roleHighlightText}>{user.role}</Text>
-              </>
-            ) : null}
-          </View>
-          <Text style={styles.greetingText} numberOfLines={1}>
-            Halo, {user?.displayName || "Mahasiswa"}
-          </Text>
-          <Text style={styles.emailText} numberOfLines={1}>
-            {user?.email || "Akun terverifikasi"}
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={handleLogout}
-          style={({ pressed }) => [
-            styles.logoutButton,
-            pressed && styles.logoutButtonPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Keluar dari akun"
-        >
-          <Text style={styles.logoutButtonText}>Keluar</Text>
-        </Pressable>
-      </View>
-
-      {/* Satu Kelompok Mandiri: Form Input Data Mahasiswa */}
-      <View style={styles.formSurface}>
-        <View style={styles.formHeader}>
-          <Text style={styles.formTitle}>Tambah Mahasiswa</Text>
-          <Text style={styles.formSubtitle}>
-            Data baru langsung tersinkron ke daftar mahasiswa.
-          </Text>
-        </View>
-
-        <View style={styles.rowPair}>
-          <View style={styles.colNim}>
-            <Text style={styles.inputLabel}>NIM</Text>
-            <TextInput
-              style={[styles.input, focusedField === "nim" && styles.inputFocused]}
-              placeholder="Contoh: 1201223045"
-              placeholderTextColor={COLORS.inkMuted}
-              value={nim}
-              onChangeText={(val) => {
-                setNim(val);
-                if (formError) setFormError(null);
-              }}
-              onFocus={() => setFocusedField("nim")}
-              onBlur={() => setFocusedField(null)}
-              keyboardType="numeric"
-              returnKeyType="next"
-              onSubmitEditing={() => angkatanRef.current?.focus()}
-              editable={!submitting}
-            />
-          </View>
-
-          <View style={styles.colAngkatan}>
-            <Text style={styles.inputLabel}>Angkatan</Text>
-            <TextInput
-              ref={angkatanRef}
-              style={[
-                styles.input,
-                focusedField === "angkatan" && styles.inputFocused,
-              ]}
-              placeholder="2024"
-              placeholderTextColor={COLORS.inkMuted}
-              value={angkatan}
-              onChangeText={(val) => {
-                setAngkatan(val);
-                if (formError) setFormError(null);
-              }}
-              onFocus={() => setFocusedField("angkatan")}
-              onBlur={() => setFocusedField(null)}
-              keyboardType="numeric"
-              returnKeyType="next"
-              onSubmitEditing={() => namaRef.current?.focus()}
-              editable={!submitting}
-            />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Nama Lengkap</Text>
-          <TextInput
-            ref={namaRef}
-            style={[styles.input, focusedField === "nama" && styles.inputFocused]}
-            placeholder="Masukkan nama mahasiswa"
-            placeholderTextColor={COLORS.inkMuted}
-            value={nama}
-            onChangeText={(val) => {
-              setNama(val);
-              if (formError) setFormError(null);
-            }}
-            onFocus={() => setFocusedField("nama")}
-            onBlur={() => setFocusedField(null)}
-            returnKeyType="next"
-            onSubmitEditing={() => jurusanRef.current?.focus()}
-            editable={!submitting}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Jurusan / Program Studi</Text>
-          <TextInput
-            ref={jurusanRef}
-            style={[
-              styles.input,
-              focusedField === "jurusan" && styles.inputFocused,
-            ]}
-            placeholder="Contoh: S1 Rekayasa Perangkat Lunak"
-            placeholderTextColor={COLORS.inkMuted}
-            value={jurusan}
-            onChangeText={(val) => {
-              setJurusan(val);
-              if (formError) setFormError(null);
-            }}
-            onFocus={() => setFocusedField("jurusan")}
-            onBlur={() => setFocusedField(null)}
-            returnKeyType="done"
-            onSubmitEditing={handleAdd}
-            editable={!submitting}
-          />
-        </View>
-
-        {formError ? (
-          <View style={styles.errorBanner} accessibilityLiveRegion="polite">
-            <Text style={styles.errorText}>{formError}</Text>
-          </View>
-        ) : null}
-
-        <Pressable
-          onPress={handleAdd}
-          disabled={submitting}
-          style={({ pressed }) => [
-            styles.saveButton,
-            pressed && !submitting && styles.saveButtonPressed,
-            submitting && styles.buttonDisabled,
-          ]}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: submitting, busy: submitting }}
-        >
-          {submitting ? (
-            <ActivityIndicator color={COLORS.ink} size="small" />
-          ) : (
-            <Text style={styles.saveButtonText}>Simpan Mahasiswa</Text>
-          )}
-        </Pressable>
-      </View>
-
-      {/* Header Daftar Mahasiswa */}
-      <View style={styles.listHeaderRow}>
-        <Text style={styles.listTitle}>Daftar Mahasiswa</Text>
-        <Text style={styles.listCount}>{cleanStudents.length} tercatat</Text>
-      </View>
-    </View>
-  );
-
-  const renderFooter = () => (
-    <View style={styles.footerBlock}>
-      <Pressable
-        onPress={() => router.push("/test-role" as any)}
-        style={styles.footerLinkButton}
-        accessibilityRole="button"
-      >
-        <Text style={styles.footerLinkText}>Verifikasi integritas role akun</Text>
-      </Pressable>
-    </View>
-  );
+  const isEditing = Boolean(editingStudent);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
@@ -355,44 +315,416 @@ export default function HomePage() {
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <FlatList
-          data={cleanStudents}
-          keyExtractor={(item, index) => item.nim || item.id || `mhs-${index}`}
-          ListHeaderComponent={renderHeader()}
-          ListFooterComponent={renderFooter()}
+        {/* Top Horizontal Shell Header */}
+        <AppShellHeader activeTab="home" user={user} />
+
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.pageContent}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <View style={styles.studentRow}>
-              <View style={styles.studentInfo}>
-                <Text style={styles.studentName}>{item.nama}</Text>
-                <Text style={styles.studentMeta}>
-                  {item.nim} · {item.jurusan} · Angkatan {item.angkatan}
-                </Text>
+        >
+          <View style={styles.shellContainer}>
+            {/* Page Heading & Intro */}
+            <View style={styles.pageIntroBlock}>
+              <Text style={styles.pageTitle}>Data Mahasiswa</Text>
+              <Text style={styles.pageIntro}>
+                Kelola catatan mahasiswa terdaftar. Tambah data baru, perbarui detail,
+                atau hapus data mahasiswa.
+              </Text>
+            </View>
+
+            {/* Unobtrusive Status Feedback */}
+            {feedback ? (
+              <View
+                style={[
+                  styles.feedbackBanner,
+                  feedback.type === "info" && styles.feedbackBannerInfo,
+                ]}
+                accessibilityLiveRegion="polite"
+              >
+                <View style={styles.feedbackLeft}>
+                  <View
+                    style={[
+                      styles.feedbackAccent,
+                      feedback.type === "info" && styles.feedbackAccentInfo,
+                    ]}
+                  />
+                  <Text style={styles.feedbackText}>{feedback.message}</Text>
+                </View>
+                <Pressable
+                  onPress={() => setFeedback(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.feedbackClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tutup notifikasi"
+                >
+                  <Text style={styles.feedbackCloseText}>Tutup</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* Responsive Two-Column Desktop / Stacked Mobile Layout */}
+            <View style={[styles.mainGrid, isDesktop && styles.mainGridDesktop]}>
+              {/* Left Column: CRUD Form */}
+              <View style={[styles.formColumn, isDesktop && styles.formColumnDesktop]}>
+                <View
+                  style={[
+                    styles.formPanel,
+                    isEditing && styles.formPanelEditing,
+                  ]}
+                >
+                  <View style={styles.formHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.formSectionTag}>
+                        {isEditing ? "MODE EDIT" : "FORM INPUT"}
+                      </Text>
+                      <Text style={styles.formHeading}>
+                        {isEditing ? "Edit Mahasiswa" : "Tambah Mahasiswa"}
+                      </Text>
+                    </View>
+                    {isEditing ? (
+                      <View style={styles.editingPill}>
+                        <Text style={styles.editingPillText} numberOfLines={1}>
+                          {editingStudent?.nim}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Field: Nama */}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Nama</Text>
+                    <TextInput
+                      ref={namaRef}
+                      style={[
+                        styles.input,
+                        focusedField === "nama" && styles.inputFocused,
+                        Boolean(fieldErrors.nama) && styles.inputError,
+                      ]}
+                      placeholder="Contoh: Burhan Pratama"
+                      placeholderTextColor={COLORS.inkMuted}
+                      value={nama}
+                      onChangeText={(val) => {
+                        setNama(val);
+                        clearSingleFieldError("nama");
+                      }}
+                      onFocus={() => setFocusedField("nama")}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      onSubmitEditing={() => nimRef.current?.focus()}
+                      editable={!submitting}
+                      accessibilityLabel="Nama"
+                    />
+                    {fieldErrors.nama ? (
+                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
+                        {fieldErrors.nama}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Field: NIM */}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>NIM</Text>
+                    <TextInput
+                      ref={nimRef}
+                      style={[
+                        styles.input,
+                        focusedField === "nim" && styles.inputFocused,
+                        Boolean(fieldErrors.nim) && styles.inputError,
+                      ]}
+                      placeholder="Contoh: 1201223045"
+                      placeholderTextColor={COLORS.inkMuted}
+                      value={nim}
+                      onChangeText={(val) => {
+                        setNim(val);
+                        clearSingleFieldError("nim");
+                      }}
+                      onFocus={() => setFocusedField("nim")}
+                      onBlur={() => setFocusedField(null)}
+                      keyboardType="numeric"
+                      returnKeyType="next"
+                      onSubmitEditing={() => angkatanRef.current?.focus()}
+                      editable={!submitting}
+                      accessibilityLabel="NIM"
+                    />
+                    {fieldErrors.nim ? (
+                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
+                        {fieldErrors.nim}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Field: Angkatan */}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Angkatan</Text>
+                    <TextInput
+                      ref={angkatanRef}
+                      style={[
+                        styles.input,
+                        focusedField === "angkatan" && styles.inputFocused,
+                        Boolean(fieldErrors.angkatan) && styles.inputError,
+                      ]}
+                      placeholder="Contoh: 2024"
+                      placeholderTextColor={COLORS.inkMuted}
+                      value={angkatan}
+                      onChangeText={(val) => {
+                        setAngkatan(val);
+                        clearSingleFieldError("angkatan");
+                      }}
+                      onFocus={() => setFocusedField("angkatan")}
+                      onBlur={() => setFocusedField(null)}
+                      keyboardType="numeric"
+                      maxLength={4}
+                      returnKeyType="next"
+                      onSubmitEditing={() => jurusanRef.current?.focus()}
+                      editable={!submitting}
+                      accessibilityLabel="Angkatan"
+                    />
+                    {fieldErrors.angkatan ? (
+                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
+                        {fieldErrors.angkatan}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Field: Jurusan */}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Jurusan</Text>
+                    <TextInput
+                      ref={jurusanRef}
+                      style={[
+                        styles.input,
+                        focusedField === "jurusan" && styles.inputFocused,
+                        Boolean(fieldErrors.jurusan) && styles.inputError,
+                      ]}
+                      placeholder="Contoh: S1 Rekayasa Perangkat Lunak"
+                      placeholderTextColor={COLORS.inkMuted}
+                      value={jurusan}
+                      onChangeText={(val) => {
+                        setJurusan(val);
+                        clearSingleFieldError("jurusan");
+                      }}
+                      onFocus={() => setFocusedField("jurusan")}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSubmitForm}
+                      editable={!submitting}
+                      accessibilityLabel="Jurusan"
+                    />
+                    {fieldErrors.jurusan ? (
+                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
+                        {fieldErrors.jurusan}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Submit & Cancel Actions */}
+                  <View style={styles.formActionsRow}>
+                    <Pressable
+                      onPress={handleSubmitForm}
+                      disabled={submitting}
+                      style={({ pressed }) => [
+                        styles.submitButton,
+                        isEditing && styles.submitButtonFlex,
+                        pressed && !submitting && styles.submitButtonPressed,
+                        submitting && styles.buttonDisabled,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: submitting, busy: submitting }}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator size="small" color={COLORS.ink} />
+                      ) : (
+                        <Text style={styles.submitButtonText}>
+                          {isEditing ? "Simpan Perubahan" : "Tambah Mahasiswa"}
+                        </Text>
+                      )}
+                    </Pressable>
+
+                    {isEditing ? (
+                      <Pressable
+                        onPress={resetForm}
+                        disabled={submitting}
+                        style={({ pressed }) => [
+                          styles.cancelEditButton,
+                          pressed && styles.cancelEditButtonPressed,
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.cancelEditButtonText}>Batal</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               </View>
 
+              {/* Right Column: Student List Section */}
+              <View style={styles.listColumn}>
+                <View style={styles.listSectionHeader}>
+                  <Text style={styles.listSectionTitle}>Daftar Mahasiswa</Text>
+                  <View style={styles.countBox}>
+                    <Text style={styles.countNumber}>{cleanStudents.length}</Text>
+                    <Text style={styles.countLabel}>mahasiswa</Text>
+                  </View>
+                </View>
+
+                {cleanStudents.length === 0 ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyTitle}>Belum ada data mahasiswa</Text>
+                    <Text style={styles.emptySubtitle}>
+                      Tambahkan data mahasiswa pertama melalui form{" "}
+                      {isDesktop ? "di sebelah kiri" : "di atas"} untuk menampilkannya di
+                      daftar ini.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.cardsStack}>
+                    {cleanStudents.map((item) => {
+                      const isBeingEdited =
+                        editingStudent &&
+                        (editingStudent.id === item.id ||
+                          editingStudent.nim === item.nim);
+
+                      return (
+                        <View
+                          key={item.nim || item.id || item.nama}
+                          style={[
+                            styles.studentCard,
+                            isBeingEdited && styles.studentCardActive,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.cardContentLayout,
+                              !isCompactMobile && styles.cardContentLayoutRow,
+                            ]}
+                          >
+                            {/* Student Info */}
+                            <View style={styles.cardMainInfo}>
+                              <View style={styles.cardTitleRow}>
+                                <Text style={styles.studentName}>{item.nama}</Text>
+                                {isBeingEdited ? (
+                                  <Text style={styles.editingTag}>Sedang diedit</Text>
+                                ) : null}
+                              </View>
+
+                              <View style={styles.metaGrid}>
+                                <View style={styles.metaCell}>
+                                  <Text style={styles.metaLabel}>NIM</Text>
+                                  <Text style={styles.metaValue}>{item.nim}</Text>
+                                </View>
+
+                                <View style={styles.metaCell}>
+                                  <Text style={styles.metaLabel}>ANGKATAN</Text>
+                                  <Text style={styles.metaValue}>{item.angkatan}</Text>
+                                </View>
+
+                                <View style={styles.metaCellWide}>
+                                  <Text style={styles.metaLabel}>JURUSAN</Text>
+                                  <Text style={styles.metaValue}>{item.jurusan}</Text>
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* Card Actions */}
+                            <View
+                              style={[
+                                styles.cardActions,
+                                isCompactMobile
+                                  ? styles.cardActionsMobile
+                                  : styles.cardActionsDesktop,
+                              ]}
+                            >
+                              <Pressable
+                                onPress={() => handleStartEdit(item)}
+                                style={({ pressed }) => [
+                                  styles.editButton,
+                                  isBeingEdited && styles.editButtonActive,
+                                  pressed && styles.editButtonPressed,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Edit ${item.nama}`}
+                              >
+                                <View style={styles.editAccentBar} />
+                                <Text style={styles.editButtonText}>Edit</Text>
+                              </Pressable>
+
+                              <Pressable
+                                onPress={() => setPendingDelete(item)}
+                                style={({ pressed }) => [
+                                  styles.deleteButton,
+                                  pressed && styles.deleteButtonPressed,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Hapus ${item.nama}`}
+                              >
+                                <Text style={styles.deleteButtonText}>Hapus</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Simple Delete Confirmation Dialog */}
+      <Modal
+        visible={Boolean(pendingDelete)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Hapus Mahasiswa</Text>
+            <Text style={styles.modalBody}>
+              Hapus data{" "}
+              <Text style={styles.modalStudentName}>{pendingDelete?.nama}</Text> (NIM{" "}
+              {pendingDelete?.nim}) dari daftar mahasiswa?
+            </Text>
+
+            <View style={styles.modalActions}>
               <Pressable
-                onPress={() => handleDelete(item.id, item.nim)}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                onPress={() => setPendingDelete(null)}
+                disabled={deleting}
                 style={({ pressed }) => [
-                  styles.deleteButton,
-                  pressed && styles.deleteButtonPressed,
+                  styles.modalCancelButton,
+                  pressed && styles.modalCancelPressed,
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel={`Hapus ${item.nama}`}
               >
-                <Text style={styles.deleteButtonText}>Hapus</Text>
+                <Text style={styles.modalCancelText}>Batal</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleConfirmDelete}
+                disabled={deleting}
+                style={({ pressed }) => [
+                  styles.modalConfirmDeleteButton,
+                  pressed && styles.modalConfirmDeletePressed,
+                  deleting && styles.buttonDisabled,
+                ]}
+                accessibilityRole="button"
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color={COLORS.coralInk} />
+                ) : (
+                  <Text style={styles.modalConfirmDeleteText}>Hapus</Text>
+                )}
               </Pressable>
             </View>
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>Belum ada data mahasiswa tersimpan.</Text>
-            </View>
-          }
-        />
-      </KeyboardAvoidingView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -412,260 +744,464 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   loadingText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.regular,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 14,
     color: COLORS.inkMuted,
   },
-  listContent: {
-    width: "100%",
-    maxWidth: 640,
-    alignSelf: "center",
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
+
+  // Main Content Shell
+  pageContent: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.lg,
     paddingBottom: SPACING.xl,
   },
-  headerWrapper: {
-    marginBottom: SPACING.xs,
+  shellContainer: {
+    width: "100%",
+    maxWidth: 1120,
+    alignSelf: "center",
   },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: SPACING.md,
-    paddingBottom: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+  pageIntroBlock: {
     marginBottom: SPACING.lg,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1.5,
+    borderBottomColor: "rgba(34, 42, 42, 0.18)",
   },
-  identityBlock: {
-    flex: 1,
-  },
-  statusLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginBottom: 6,
-  },
-  statusDotPrimary: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
-    marginRight: 6,
-  },
-  statusText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
-    fontSize: 12,
-    color: COLORS.inkMuted,
-  },
-  statusSeparator: {
-    fontFamily: FONTS.family,
-    fontSize: 12,
-    color: COLORS.border,
-    marginHorizontal: 6,
-  },
-  statusDotHighlight: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: COLORS.orange,
-    marginRight: 6,
-  },
-  roleHighlightText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    fontSize: 12,
-    color: COLORS.orangeInk,
-  },
-  greetingText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.bold,
+  pageTitle: {
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 24,
     lineHeight: 30,
     color: COLORS.ink,
+    marginBottom: 4,
   },
-  emailText: {
-    fontFamily: FONTS.family,
+  pageIntro: {
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
     color: COLORS.inkMuted,
-    marginTop: 2,
   },
-  logoutButton: {
-    minHeight: 44,
-    minWidth: 72,
-    paddingHorizontal: 14,
-    justifyContent: "center",
+
+  // Feedback Banner
+  feedbackBanner: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.primarySurface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: SPACING.lg,
+    gap: 12,
+    ...retroOffset("sm"),
+  },
+  feedbackBannerInfo: {
+    backgroundColor: COLORS.orangeSurface,
+  },
+  feedbackLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 10,
+  },
+  feedbackAccent: {
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
+    borderColor: COLORS.ink,
+  },
+  feedbackAccentInfo: {
+    backgroundColor: COLORS.orange,
+  },
+  feedbackText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 13,
+    color: COLORS.ink,
+    flex: 1,
+  },
+  feedbackClose: {
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: 8,
     ...(WEB_POINTER || {}),
   },
-  logoutButtonPressed: {
-    backgroundColor: COLORS.coralSurface,
-    borderColor: COLORS.coral,
+  feedbackCloseText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 12,
+    color: COLORS.inkMuted,
+    textDecorationLine: "underline",
   },
-  logoutButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    fontSize: 13,
-    color: COLORS.coralInk,
+
+  // Two-column Grid
+  mainGrid: {
+    flexDirection: "column",
+    gap: SPACING.lg,
   },
-  formSurface: {
+  mainGridDesktop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: SPACING.lg,
+  },
+  formColumn: {
+    width: "100%",
+  },
+  formColumnDesktop: {
+    width: 360,
+    flexShrink: 0,
+  },
+  listColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  // Form Panel
+  formPanel: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.lg,
+    padding: SPACING.lg,
+    ...retroOffset("md"),
   },
-  formHeader: {
+  formPanelEditing: {
+    borderColor: COLORS.primary,
+  },
+  formHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
     marginBottom: SPACING.md,
+    paddingBottom: 12,
+    borderBottomWidth: 1.5,
+    borderBottomColor: "rgba(34, 42, 42, 0.16)",
   },
-  formTitle: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    fontSize: 16,
+  formSectionTag: {
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 11,
+    letterSpacing: 0.7,
+    color: COLORS.rust,
+    marginBottom: 4,
+  },
+  formHeading: {
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 17,
     lineHeight: 22,
     color: COLORS.ink,
   },
-  formSubtitle: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.regular,
-    fontSize: 12,
-    lineHeight: 18,
-    color: COLORS.inkMuted,
-    marginTop: 2,
+  editingPill: {
+    backgroundColor: COLORS.orangeSurface,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: 120,
   },
-  rowPair: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-    marginBottom: 12,
-  },
-  colNim: {
-    flex: 1.4,
-  },
-  colAngkatan: {
-    flex: 1,
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  inputLabel: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
-    fontSize: 12,
+  editingPillText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 11,
     color: COLORS.ink,
-    marginBottom: 4,
+  },
+  fieldGroup: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 13,
+    color: COLORS.ink,
+    marginBottom: 5,
   },
   input: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
     color: COLORS.ink,
-    backgroundColor: COLORS.surfaceInput,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 12,
     minHeight: 44,
   },
   inputFocused: {
     borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
   },
-  errorBanner: {
-    backgroundColor: COLORS.coralSurface,
-    borderWidth: 1,
+  inputError: {
     borderColor: COLORS.coral,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
   },
-  errorText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+  fieldErrorText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 16,
     color: COLORS.coralInk,
+    marginTop: 5,
   },
-  saveButton: {
+  formActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 6,
+  },
+  submitButton: {
+    width: "100%",
     backgroundColor: COLORS.primary,
-    minHeight: 46,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
+    minHeight: 46,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 4,
+    paddingHorizontal: 14,
+    ...retroOffset("sm"),
     ...(WEB_POINTER || {}),
   },
-  saveButtonPressed: {
+  submitButtonFlex: {
+    flex: 1,
+    width: undefined,
+  },
+  submitButtonPressed: {
     backgroundColor: COLORS.primaryPressed,
   },
   buttonDisabled: {
     opacity: 0.65,
   },
-  saveButtonText: {
-    fontFamily: FONTS.family,
+  submitButtonText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 14,
+    color: COLORS.ink,
+  },
+  cancelEditButton: {
+    minHeight: 46,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    ...retroOffset("sm"),
+    ...(WEB_POINTER || {}),
+  },
+  cancelEditButtonPressed: {
+    backgroundColor: COLORS.surfacePressed,
+  },
+  cancelEditButtonText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 14,
+    color: COLORS.ink,
+  },
+
+  // List Section Header
+  listSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.md,
+    gap: 12,
+  },
+  listSectionTitle: {
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 18,
+    color: COLORS.ink,
+  },
+  countBox: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  countNumber: {
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 14,
+    color: COLORS.rust,
+  },
+  countLabel: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 12,
+    color: COLORS.inkMuted,
+  },
+
+  // Empty State
+  emptyCard: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+    alignItems: "flex-start",
+  },
+  emptyTitle: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 16,
+    color: COLORS.ink,
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.inkMuted,
+  },
+
+  // Cards Stack & Card Layout
+  cardsStack: {
+    gap: 14,
+  },
+  studentCard: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    ...retroOffset("md"),
+  },
+  studentCardActive: {
+    borderColor: COLORS.primary,
+  },
+  cardContentLayout: {
+    gap: 14,
+  },
+  cardContentLayoutRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 16,
+  },
+  cardMainInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  studentName: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 17,
+    lineHeight: 22,
+    color: COLORS.ink,
+  },
+  editingTag: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 11,
+    color: COLORS.primaryInk,
+    backgroundColor: COLORS.primarySurface,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  metaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+  metaCell: {
+    minWidth: 96,
+  },
+  metaCellWide: {
+    flex: 1,
+    minWidth: 160,
+  },
+  metaLabel: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    color: COLORS.rust,
+    marginBottom: 2,
+  },
+  metaValue: {
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 14,
     color: COLORS.ink,
   },
-  listHeaderRow: {
+
+  // Card Actions
+  cardActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    gap: 8,
   },
-  listTitle: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    fontSize: 17,
-    color: COLORS.ink,
-  },
-  listCount: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
-    fontSize: 13,
-    color: COLORS.inkMuted,
-  },
-  studentRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  cardActionsDesktop: {
+    flexShrink: 0,
     alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    gap: SPACING.sm,
   },
-  studentInfo: {
-    flex: 1,
+  cardActionsMobile: {
+    paddingTop: 10,
+    borderTopWidth: 1.5,
+    borderTopColor: "rgba(34, 42, 42, 0.14)",
   },
-  studentName: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    fontSize: 15,
-    lineHeight: 20,
-    color: COLORS.ink,
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 44,
+    minWidth: 74,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
+    gap: 6,
+    ...(WEB_POINTER || {}),
   },
-  studentMeta: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.regular,
+  editButtonActive: {
+    backgroundColor: COLORS.primarySurface,
+    borderColor: COLORS.primary,
+  },
+  editButtonPressed: {
+    backgroundColor: COLORS.surfacePressed,
+  },
+  editAccentBar: {
+    width: 6,
+    height: 14,
+    borderRadius: 1,
+    backgroundColor: COLORS.primary,
+  },
+  editButtonText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
-    lineHeight: 19,
-    color: COLORS.inkMuted,
-    marginTop: 2,
+    color: COLORS.ink,
   },
   deleteButton: {
     minHeight: 44,
-    minWidth: 56,
-    paddingHorizontal: 10,
+    minWidth: 74,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.coral,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     alignItems: "center",
@@ -675,35 +1211,96 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.coralSurface,
   },
   deleteButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
     color: COLORS.coralInk,
   },
-  emptyBox: {
-    paddingVertical: SPACING.xl,
+
+  // Confirmation Dialog
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: COLORS.scrim,
+    justifyContent: "center",
     alignItems: "center",
+    padding: SPACING.lg,
   },
-  emptyText: {
-    fontFamily: FONTS.family,
+  modalBox: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+    ...retroOffset("md"),
+  },
+  modalTitle: {
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 16,
+    color: COLORS.ink,
+    marginBottom: 8,
+  },
+  modalBody: {
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
+    lineHeight: 21,
     color: COLORS.inkMuted,
+    marginBottom: SPACING.lg,
   },
-  footerBlock: {
-    paddingTop: SPACING.lg,
-    alignItems: "flex-start",
+  modalStudentName: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.ink,
   },
-  footerLinkButton: {
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  modalCancelButton: {
     minHeight: 44,
+    minWidth: 88,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     justifyContent: "center",
+    alignItems: "center",
     ...(WEB_POINTER || {}),
   },
-  footerLinkText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
-    fontSize: 13,
-    color: COLORS.inkMuted,
-    textDecorationLine: "underline",
+  modalCancelPressed: {
+    backgroundColor: COLORS.surfacePressed,
+  },
+  modalCancelText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 14,
+    color: COLORS.ink,
+  },
+  modalConfirmDeleteButton: {
+    minHeight: 44,
+    minWidth: 96,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.coralSurface,
+    borderWidth: 2,
+    borderColor: COLORS.coral,
+    justifyContent: "center",
+    alignItems: "center",
+    ...retroOffset("sm"),
+    ...(WEB_POINTER || {}),
+  },
+  modalConfirmDeletePressed: {
+    opacity: 0.9,
+  },
+  modalConfirmDeleteText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 14,
+    color: COLORS.coralInk,
   },
 });

@@ -16,6 +16,7 @@ import {
   RADIUS,
   SPACING,
   WEB_POINTER,
+  retroOffset,
 } from "../constants/theme";
 import {
   runRoleTestSuite,
@@ -73,7 +74,7 @@ export default function TestRoleScreen() {
           <View style={[styles.badge, styles.runningBadge]}>
             <ActivityIndicator
               size="small"
-              color={COLORS.orangeInk}
+              color={COLORS.ink}
               style={{ marginRight: 6 }}
             />
             <Text style={styles.badgeTextRunning}>RUNNING</Text>
@@ -95,7 +96,6 @@ export default function TestRoleScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Group */}
         <View style={styles.headerBlock}>
           <Text style={styles.title}>Verifikasi Role Akun</Text>
           <Text style={styles.subtitle}>
@@ -144,11 +144,10 @@ export default function TestRoleScreen() {
           ) : null}
         </View>
 
-        {/* List Test Cases */}
         {testResults.length > 0 && (
           <View style={styles.testList}>
             {testResults.map((tc) => (
-              <View key={tc.id} style={styles.testRow}>
+              <View key={tc.id} style={styles.testCard}>
                 <View style={styles.testCardHeader}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.testId}>{tc.id}</Text>
@@ -194,7 +193,6 @@ export default function TestRoleScreen() {
           </View>
         )}
 
-        {/* Navigation Buttons */}
         <View style={styles.navButtons}>
           <Pressable
             style={({ pressed }) => [
@@ -232,64 +230,65 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.lg,
-    maxWidth: 640,
+    maxWidth: 680,
     width: "100%",
     alignSelf: "center",
   },
   headerBlock: {
     marginBottom: SPACING.lg,
-    paddingBottom: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   title: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.bold,
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 22,
     lineHeight: 28,
     color: COLORS.ink,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subtitle: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 20,
     color: COLORS.inkMuted,
     marginBottom: SPACING.md,
   },
   metaBox: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     gap: 6,
     marginBottom: SPACING.md,
+    ...retroOffset("md"),
   },
   metaText: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
     color: COLORS.ink,
     lineHeight: 19,
   },
   metaLabel: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.ink,
   },
   roleHighlight: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    color: COLORS.orangeInk,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.rust,
   },
   runButton: {
     backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     minHeight: 48,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     alignItems: "center",
+    ...retroOffset("sm"),
     ...(WEB_POINTER || {}),
   },
   runButtonPressed: {
@@ -299,8 +298,8 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   runButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.ink,
     fontSize: 15,
   },
@@ -309,23 +308,27 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primarySurface,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
   },
   summaryText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
-    color: COLORS.primaryInk,
+    color: COLORS.ink,
     textAlign: "center",
   },
   testList: {
+    gap: 12,
     marginBottom: SPACING.lg,
   },
-  testRow: {
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+  testCard: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    ...retroOffset("md"),
   },
   testCardHeader: {
     flexDirection: "row",
@@ -334,20 +337,20 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   testId: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 11,
-    color: COLORS.inkMuted,
+    color: COLORS.rust,
   },
   testTitle: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 15,
     color: COLORS.ink,
     marginTop: 2,
   },
   testDesc: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
     lineHeight: 19,
@@ -358,25 +361,25 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   label: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 11,
-    color: COLORS.inkMuted,
+    color: COLORS.rust,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   valExpected: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 18,
     color: COLORS.ink,
     marginTop: 2,
   },
   valActual: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
-    fontSize: 12,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    fontSize: 13,
     lineHeight: 18,
     color: COLORS.ink,
     marginTop: 2,
@@ -388,19 +391,19 @@ const styles = StyleSheet.create({
     color: COLORS.coralInk,
   },
   detailsBlock: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.background,
     padding: 10,
     borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
     marginTop: 8,
     gap: 2,
   },
   detailItem: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 12,
-    color: COLORS.inkMuted,
+    color: COLORS.ink,
     lineHeight: 18,
   },
   badge: {
@@ -409,13 +412,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: RADIUS.sm,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
   },
   passBadge: {
     backgroundColor: COLORS.primarySurface,
   },
   badgeTextPass: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.primaryInk,
     fontSize: 11,
   },
@@ -423,8 +428,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.coralSurface,
   },
   badgeTextFail: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.coralInk,
     fontSize: 11,
   },
@@ -432,17 +437,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.orangeSurface,
   },
   badgeTextRunning: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    color: COLORS.orangeInk,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.ink,
     fontSize: 11,
   },
   pendingBadge: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.background,
   },
   badgeTextPending: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.inkMuted,
     fontSize: 11,
   },
@@ -464,28 +469,29 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   backButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    color: COLORS.background,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.surface,
     fontSize: 13,
   },
   backLoginButton: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     minHeight: 46,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     alignItems: "center",
+    ...retroOffset("sm"),
     ...(WEB_POINTER || {}),
   },
   backLoginButtonPressed: {
     backgroundColor: COLORS.surfacePressed,
   },
   backLoginButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.ink,
     fontSize: 13,
   },

@@ -34,12 +34,11 @@ export const DEFAULT_MAHASISWA: Mahasiswa[] = [
 ];
 
 /**
- * Normalisasi data Mahasiswa dan hapus semua duplikat berdasarkan NIM maupun Nama.
+ * Normalisasi data Mahasiswa dan hapus semua duplikat berdasarkan NIM / ID.
  * Menjamin 1 mahasiswa hanya muncul 1 kali.
  */
 export function deduplicateMahasiswa(list: Mahasiswa[]): Mahasiswa[] {
   const seenNim = new Set<string>();
-  const seenNama = new Set<string>();
   const seenId = new Set<string>();
   const result: Mahasiswa[] = [];
 
@@ -55,19 +54,13 @@ export function deduplicateMahasiswa(list: Mahasiswa[]): Mahasiswa[] {
     if (!nim && !nama) continue;
 
     const nimKey = nim.toLowerCase();
-    const namaKey = nama.toLowerCase();
     const idKey = id.toLowerCase();
 
-    if (
-      (nimKey && seenNim.has(nimKey)) ||
-      (namaKey && seenNama.has(namaKey)) ||
-      (idKey && seenId.has(idKey))
-    ) {
+    if ((nimKey && seenNim.has(nimKey)) || (idKey && seenId.has(idKey))) {
       continue;
     }
 
     if (nimKey) seenNim.add(nimKey);
-    if (namaKey) seenNama.add(namaKey);
     if (idKey) seenId.add(idKey);
 
     result.push({
@@ -264,6 +257,81 @@ export async function addMahasiswa(data: Omit<Mahasiswa, "id">): Promise<Mahasis
   }
 
   return newItem;
+}
+
+/**
+ * Memperbarui data mahasiswa yang sudah ada pada penyimpanan lokal dan Cloud Firestore.
+ */
+export async function updateMahasiswa(
+  originalId: string,
+  originalNim: string,
+  data: Omit<Mahasiswa, "id" | "createdAt">
+): Promise<Mahasiswa> {
+  const cleanNim = String(data.nim ?? "").trim();
+  const cleanNama = String(data.nama ?? "").trim();
+  const cleanJurusan = String(data.jurusan ?? "").trim();
+  const cleanAngkatan = String(data.angkatan ?? "").trim();
+  const nextDocId = cleanNim || originalId;
+
+  const currentList = await getLocalMahasiswa();
+  const existingItem = currentList.find(
+    (m) =>
+      m.id === originalId ||
+      (originalNim && String(m.nim).trim() === String(originalNim).trim())
+  );
+
+  const updatedItem: Mahasiswa = {
+    id: nextDocId,
+    nim: cleanNim,
+    nama: cleanNama,
+    jurusan: cleanJurusan,
+    angkatan: cleanAngkatan,
+    createdAt: existingItem?.createdAt || new Date().toISOString(),
+  };
+
+  let replaced = false;
+  const updatedList = currentList.map((m) => {
+    const isMatch =
+      m.id === originalId ||
+      (originalNim && String(m.nim).trim() === String(originalNim).trim());
+    if (isMatch) {
+      replaced = true;
+      return updatedItem;
+    }
+    return m;
+  });
+
+  if (!replaced) {
+    updatedList.unshift(updatedItem);
+  }
+
+  const cleanUpdated = await saveLocalMahasiswa(updatedList);
+  notifyListeners(cleanUpdated);
+
+  if (isFirebaseConfigured()) {
+    (async () => {
+      try {
+        await setDoc(doc(db, MAHASISWA_COLLECTION, nextDocId), {
+          nim: updatedItem.nim,
+          nama: updatedItem.nama,
+          jurusan: updatedItem.jurusan,
+          angkatan: updatedItem.angkatan,
+          createdAt: updatedItem.createdAt,
+        });
+
+        if (originalId && originalId !== nextDocId) {
+          await deleteDoc(doc(db, MAHASISWA_COLLECTION, originalId));
+        }
+        if (originalNim && originalNim !== nextDocId && originalNim !== originalId) {
+          await deleteDoc(doc(db, MAHASISWA_COLLECTION, originalNim));
+        }
+      } catch (err: any) {
+        console.warn("[MahasiswaService] Gagal memperbarui di Firestore:", err?.message);
+      }
+    })();
+  }
+
+  return updatedItem;
 }
 
 /**

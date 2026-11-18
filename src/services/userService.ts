@@ -11,9 +11,39 @@ const CANONICAL_USERNAMES: Record<string, string> = {
   "yumatamahazza@gmail.com": "yumahazza",
   "yumahazza@portal.local": "yumahazza",
   "yumatamahazza@portal.local": "yumahazza",
+  yumahazza: "yumahazza",
   yumatamahazza: "yumahazza",
   "yuma hazza yuditama": "yumahazza",
 };
+
+const SUPER_ADMIN_EMAILS = new Set([
+  "yumatamahazza@gmail.com",
+  "yumahazza@portal.local",
+  "yumatamahazza@portal.local",
+  "superadmin.test@gmail.com",
+]);
+
+/**
+ * Menentukan role pengguna secara konsisten.
+ * Akun dengan username 'yumahazza' (baik sign-in biasa maupun Google) otomatis berstatus Super Admin.
+ */
+export function resolveUserRole(
+  email?: string | null,
+  displayName?: string | null,
+  existingRole?: UserRole
+): UserRole {
+  const normalizedEmail = (email || "").toLowerCase().trim();
+  const normalizedName = (displayName || "").toLowerCase().trim();
+
+  if (
+    normalizedName === "yumahazza" ||
+    SUPER_ADMIN_EMAILS.has(normalizedEmail)
+  ) {
+    return "Super Admin";
+  }
+
+  return existingRole || "Mahasiswa";
+}
 
 /**
  * Menyeragamkan username/displayName agar konsisten antara login Google dan Email/Password.
@@ -108,17 +138,21 @@ export async function syncUserProfile(
     currentProviders.add(existingProfile.providerId);
   }
 
-  // Ekspektasi: Role akun adalah "Super Admin"
-  const assignedRole: UserRole = existingProfile?.role || "Super Admin";
+  const resolvedDisplayName = resolveCanonicalUsername(
+    normalizedEmail,
+    displayName,
+    existingProfile?.displayName
+  );
+  const assignedRole: UserRole = resolveUserRole(
+    normalizedEmail,
+    resolvedDisplayName,
+    existingProfile?.role
+  );
 
   const resolvedProfile: UserProfile = {
     uid: canonicalUid,
     email: normalizedEmail,
-    displayName: resolveCanonicalUsername(
-      normalizedEmail,
-      displayName,
-      existingProfile?.displayName
-    ),
+    displayName: resolvedDisplayName,
     photoURL: photoURL || existingProfile?.photoURL || null,
     providerId: providerId,
     role: assignedRole,

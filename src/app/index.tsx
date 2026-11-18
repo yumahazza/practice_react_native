@@ -30,6 +30,7 @@ import {
   RADIUS,
   SPACING,
   WEB_POINTER,
+  retroOffset,
 } from "../constants/theme";
 import { getAuthSession, saveAuthSession } from "../services/authStorage";
 import { syncUserProfile } from "../services/userService";
@@ -193,7 +194,7 @@ export default function LoginPage() {
           displayName = userCredential.user.displayName || null;
           idToken = await userCredential.user.getIdToken();
         } catch {
-          // Tetap lanjutkan simulasi/fallback sesi apabila kredensial lokal atau offline
+          // Lanjutkan sesi simulasi/lokal apabila kredensial lokal atau offline
         }
       }
 
@@ -329,22 +330,24 @@ export default function LoginPage() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.innerContainer}>
-            {/* App Mark */}
+            {/* App Logo / Short Name */}
             <View style={styles.brandRow}>
-              <View style={styles.brandMark} />
+              <View style={styles.brandBadge}>
+                <View style={styles.brandDot} />
+              </View>
               <Text style={styles.brandName}>PORTAL MAHASISWA</Text>
             </View>
 
-            {/* Title & Supporting Copy */}
+            {/* Title & Concise Intro */}
             <View style={styles.headerBlock}>
               <Text style={styles.title}>Welcome back</Text>
               <Text style={styles.subtitle}>
-                Masuk untuk mengakses dan mengelola daftar mahasiswa yang tersimpan.
+                Masuk untuk mengelola data mahasiswa dan melanjutkan sesi Anda.
               </Text>
             </View>
 
-            {/* Form Group */}
-            <View style={styles.formSection}>
+            {/* Sign-In Card */}
+            <View style={styles.card}>
               {/* Username Input */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Username</Text>
@@ -437,14 +440,14 @@ export default function LoginPage() {
                 ) : null}
               </View>
 
-              {/* Auth-level feedback */}
+              {/* Auth-level error */}
               {authError ? (
                 <View style={styles.authErrorBox} accessibilityLiveRegion="polite">
                   <Text style={styles.authErrorText}>{authError}</Text>
                 </View>
               ) : null}
 
-              {/* Primary Sign-In Button */}
+              {/* Primary CTA: Sign In */}
               <Pressable
                 onPress={handleManualSignIn}
                 disabled={isBusy}
@@ -459,18 +462,18 @@ export default function LoginPage() {
                 {submittingAction === "manual" ? (
                   <ActivityIndicator size="small" color={COLORS.ink} />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Sign in</Text>
+                  <Text style={styles.primaryButtonText}>Sign In</Text>
                 )}
               </Pressable>
 
-              {/* Separator */}
+              {/* Simple Separator */}
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>or</Text>
                 <View style={styles.dividerLine} />
               </View>
 
-              {/* Sign in with Google */}
+              {/* Secondary CTA: Sign in with Google */}
               <Pressable
                 onPress={() => handleGoogleSignIn(false)}
                 disabled={isBusy}
@@ -503,9 +506,8 @@ export default function LoginPage() {
               ) : null}
             </View>
 
-            {/* Concise Helper Note */}
             <Text style={styles.helperText}>
-              Sesi login Anda disimpan lokal agar akses berikutnya tetap cepat.
+              Sesi login disimpan lokal agar akses berikutnya tetap ringkas.
             </Text>
           </View>
         </ScrollView>
@@ -530,7 +532,7 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
     alignSelf: "center",
   },
   loadingScreen: {
@@ -540,92 +542,102 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   loadingLabel: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.regular,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 14,
     color: COLORS.inkMuted,
   },
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
-  brandMark: {
-    width: 4,
-    height: 18,
-    backgroundColor: COLORS.primary,
+  brandBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.orange,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  brandDot: {
+    width: 6,
+    height: 6,
     borderRadius: 2,
-    marginRight: SPACING.sm,
+    backgroundColor: COLORS.surface,
   },
   brandName: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    color: COLORS.ink,
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 13,
+    letterSpacing: 0.6,
+    color: COLORS.rust,
   },
   headerBlock: {
     marginBottom: SPACING.lg,
   },
   title: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.bold,
-    fontSize: 28,
-    lineHeight: 34,
+    fontFamily: FONTS.display,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 26,
+    lineHeight: 33,
     color: COLORS.ink,
-    marginBottom: SPACING.xs,
+    marginBottom: 6,
   },
   subtitle: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 22,
     color: COLORS.inkMuted,
   },
-  formSection: {
+  card: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.md,
     padding: SPACING.lg,
+    ...retroOffset("md"),
   },
   fieldGroup: {
     marginBottom: SPACING.md,
   },
   label: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
-    lineHeight: 18,
     color: COLORS.ink,
     marginBottom: 6,
   },
   input: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 15,
     color: COLORS.ink,
-    backgroundColor: COLORS.surfaceInput,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 14,
-    minHeight: 48,
+    minHeight: 46,
   },
   passwordWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surfaceInput,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
-    minHeight: 48,
+    minHeight: 46,
     paddingLeft: 14,
     paddingRight: 6,
   },
   passwordInput: {
     flex: 1,
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 15,
     color: COLORS.ink,
@@ -633,7 +645,7 @@ const styles = StyleSheet.create({
   },
   togglePasswordButton: {
     minWidth: 44,
-    minHeight: 40,
+    minHeight: 38,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 10,
@@ -644,13 +656,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfacePressed,
   },
   togglePasswordText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 12,
-    color: COLORS.inkMuted,
+    color: COLORS.rust,
   },
   inputFocused: {
     borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
   },
   inputError: {
     borderColor: COLORS.coral,
@@ -659,16 +672,16 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   fieldErrorText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 12,
     lineHeight: 16,
     color: COLORS.coralInk,
-    marginTop: 6,
+    marginTop: 5,
   },
   authErrorBox: {
     backgroundColor: COLORS.coralSurface,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.coral,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 12,
@@ -676,19 +689,22 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   authErrorText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 13,
     lineHeight: 18,
     color: COLORS.coralInk,
   },
   primaryButton: {
     backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     minHeight: 48,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     alignItems: "center",
     marginTop: SPACING.xs,
+    ...retroOffset("sm"),
     ...(WEB_POINTER || {}),
   },
   primaryButtonPressed: {
@@ -698,8 +714,8 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   primaryButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 15,
     color: COLORS.ink,
   },
@@ -710,32 +726,34 @@ const styles = StyleSheet.create({
   },
   dividerLine: {
     flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border,
+    height: 1.5,
+    backgroundColor: COLORS.ink,
+    opacity: 0.25,
   },
   dividerText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 12,
     color: COLORS.inkMuted,
     paddingHorizontal: 12,
   },
   googleButton: {
-    backgroundColor: COLORS.background,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     minHeight: 48,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     alignItems: "center",
+    ...retroOffset("sm"),
     ...(WEB_POINTER || {}),
   },
   googleButtonPressed: {
     backgroundColor: COLORS.surfacePressed,
   },
   googleButtonText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.semiBold,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
     fontSize: 15,
     color: COLORS.ink,
   },
@@ -747,14 +765,14 @@ const styles = StyleSheet.create({
     ...(WEB_POINTER || {}),
   },
   redirectLinkText: {
-    fontFamily: FONTS.family,
-    fontWeight: FONT_WEIGHTS.medium,
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 13,
     color: COLORS.primaryInk,
     textDecorationLine: "underline",
   },
   helperText: {
-    fontFamily: FONTS.family,
+    fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 12,
     lineHeight: 18,

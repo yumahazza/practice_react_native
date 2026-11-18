@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { UserProfile, AuthSession } from "../types";
-import { resolveCanonicalUsername } from "./userService";
+import { resolveCanonicalUsername, resolveUserRole } from "./userService";
 
 export const TOKEN_KEY = "@firebase_login_token";
 export const USER_KEY = "@firebase_login_user";
@@ -112,9 +112,14 @@ export async function getAuthSession(): Promise<AuthSession> {
       return { token: null, user: null };
     }
 
+    const resolvedDisplayName = resolveCanonicalUsername(
+      user.email,
+      user.displayName
+    );
     const normalizedUser: UserProfile = {
       ...user,
-      displayName: resolveCanonicalUsername(user.email, user.displayName),
+      displayName: resolvedDisplayName,
+      role: resolveUserRole(user.email, resolvedDisplayName, user.role),
     };
 
     return { token, user: normalizedUser };

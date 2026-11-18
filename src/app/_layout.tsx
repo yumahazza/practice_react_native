@@ -4,32 +4,37 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { COLORS, FONTS } from "../constants/theme";
+import { COLORS, FONTS, FONT_WEIGHTS } from "../constants/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts([
     {
-      fontFamily: FONTS.family,
+      fontFamily: FONTS.display,
       fontDefinitions: [
         {
-          path: require("../../assets/fonts/Sora-Regular.ttf"),
+          path: require("../../assets/fonts/Bungee-Regular.ttf"),
+          weight: 400,
+          display: FontDisplay.SWAP,
+        },
+      ],
+    },
+    {
+      fontFamily: FONTS.body,
+      fontDefinitions: [
+        {
+          path: require("../../assets/fonts/NunitoSans-Regular.ttf"),
           weight: 400,
           display: FontDisplay.SWAP,
         },
         {
-          path: require("../../assets/fonts/Sora-Medium.ttf"),
-          weight: 500,
-          display: FontDisplay.SWAP,
-        },
-        {
-          path: require("../../assets/fonts/Sora-SemiBold.ttf"),
+          path: require("../../assets/fonts/NunitoSans-SemiBold.ttf"),
           weight: 600,
           display: FontDisplay.SWAP,
         },
         {
-          path: require("../../assets/fonts/Sora-Bold.ttf"),
+          path: require("../../assets/fonts/NunitoSans-Bold.ttf"),
           weight: 700,
           display: FontDisplay.SWAP,
         },
@@ -56,9 +61,9 @@ export default function RootLayout() {
           headerTintColor: COLORS.ink,
           headerShadowVisible: false,
           headerTitleStyle: {
-            fontFamily: FONTS.family,
-            fontWeight: "600",
-            fontSize: 16,
+            fontFamily: FONTS.display,
+            fontWeight: FONT_WEIGHTS.regular,
+            fontSize: 15,
           },
           contentStyle: { backgroundColor: COLORS.background },
         }}
@@ -78,9 +83,16 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="profile"
+          options={{
+            title: "Profile",
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="test-role"
           options={{
-            title: "Verifikasi Role Akun",
+            title: "Verifikasi Role",
           }}
         />
         <Stack.Screen

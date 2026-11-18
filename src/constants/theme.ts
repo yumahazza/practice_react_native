@@ -1,38 +1,36 @@
-import { Platform } from "react-native";
+import { Platform, ViewStyle } from "react-native";
 
 export const COLORS = {
-  // Core requested palette
-  background: "#E2DAC2",
+  // Core palette
   ink: "#222A2A",
   primary: "#4FBBBC",
   coral: "#EC4624",
   orange: "#F39120",
+  background: "#E2DAC2",
 
-  // Functional tonal neutrals & accessible states derived strictly from the core palette
-  surface: "#ECE6D4",
-  surfaceInput: "#F4EFE2",
-  surfacePressed: "#D6CEB5",
-  primaryPressed: "#3EA5A6",
-  inkMuted: "#4E5856",
-  border: "#C7BEA3",
-  borderStrong: "#222A2A",
+  // Supporting retro tones
+  surface: "#FFF8E7",
+  rust: "#8A3F2B",
 
-  // Accessible semantic feedback surfaces & text (WCAG AA >= 4.5:1)
-  coralSurface: "#F8E3DC",
-  coralInk: "#9E2B14",
-  orangeSurface: "#F8EBD2",
-  orangeInk: "#854905",
-  primarySurface: "#D4ECE7",
-  primaryInk: "#175758",
+  // Derived functional interaction & high-contrast readable states
+  primaryPressed: "#3DA4A5",
+  surfacePressed: "#EFE6D0",
+  inkMuted: "#4B5553",
+  coralInk: "#A93118",
+  coralSurface: "#FBE5DE",
+  orangeSurface: "#FCECD5",
+  primarySurface: "#D4ECE9",
+  primaryInk: "#155758",
+  scrim: "rgba(34, 42, 42, 0.55)",
 } as const;
 
 export const FONTS = {
-  family: "Sora",
+  display: "Bungee",
+  body: "Nunito Sans",
 } as const;
 
 export const FONT_WEIGHTS = {
   regular: "400" as const,
-  medium: "500" as const,
   semiBold: "600" as const,
   bold: "700" as const,
 };
@@ -46,9 +44,35 @@ export const SPACING = {
 } as const;
 
 export const RADIUS = {
-  sm: 6,
-  md: 8,
+  sm: 4,
+  md: 6,
+  lg: 8,
 } as const;
 
 export const WEB_POINTER =
-  Platform.OS === "web" ? ({ cursor: "pointer" } as const) : undefined;
+  Platform.OS === "web" ? ({ cursor: "pointer" } as ViewStyle) : undefined;
+
+export function retroOffset(size: "sm" | "md" = "md"): ViewStyle {
+  const px = size === "sm" ? 2 : 3;
+
+  if (Platform.OS === "web") {
+    return {
+      boxShadow: `${px}px ${px}px 0px ${COLORS.ink}`,
+    } as ViewStyle;
+  }
+
+  if (Platform.OS === "ios") {
+    return {
+      shadowColor: COLORS.ink,
+      shadowOffset: { width: px, height: px },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+    };
+  }
+
+  // On Android, render a crisp stepped edge rather than blurred grey elevation.
+  return {
+    borderBottomWidth: 2 + px,
+    borderRightWidth: 2 + px,
+  };
+}
