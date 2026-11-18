@@ -176,10 +176,17 @@ export default function HomePage() {
       <View style={styles.content}>
         {/* Header Bar */}
         <View style={styles.headerBar}>
-          <View>
-            <Text style={styles.greetingText}>
-              Halo, {user?.displayName || "Mahasiswa"}
-            </Text>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={styles.greetingText}>
+                Halo, {user?.displayName || "Mahasiswa"}
+              </Text>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>
+                  {user?.role || "Super Admin"}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.emailText}>{user?.email || "Akun Terverifikasi"}</Text>
           </View>
 
@@ -190,6 +197,31 @@ export default function HomePage() {
           >
             <Text style={styles.logoutButtonText}>Keluar</Text>
           </Pressable>
+        </View>
+
+        {/* Panel Identitas Akun & Role Super Admin */}
+        <View style={styles.roleInfoCard}>
+          <View style={styles.roleInfoHead}>
+            <Text style={styles.roleInfoTitle}>👑 Status Akses: Super Admin</Text>
+            <Pressable
+              style={styles.testRunnerBtn}
+              onPress={() => router.push("/test-role" as any)}
+            >
+              <Text style={styles.testRunnerBtnText}>🧪 Jalankan Pengujian</Text>
+            </Pressable>
+          </View>
+          <View style={styles.roleDetailsGrid}>
+            <Text style={styles.roleDetailItem}>
+              <Text style={{ fontWeight: "bold" }}>UID Akun:</Text> {user?.uid || "-"}
+            </Text>
+            <Text style={styles.roleDetailItem}>
+              <Text style={{ fontWeight: "bold" }}>Metode Login:</Text>{" "}
+              {user?.providerId === "google.com" ? "Google OAuth" : "Email & Password"}
+            </Text>
+            <Text style={styles.roleDetailItem}>
+              <Text style={{ fontWeight: "bold" }}>Hak Akses:</Text> Full CRUD Mahasiswa & Role Management
+            </Text>
+          </View>
         </View>
 
         {/* Form Input Mahasiswa (Ketentuan 4) */}
@@ -322,6 +354,60 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "bold",
     color: "#172b4d",
+  },
+  roleBadge: {
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#b45309",
+  },
+  roleInfoCard: {
+    backgroundColor: "#ffffff",
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginBottom: 16,
+  },
+  roleInfoHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  roleInfoTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#0f172a",
+  },
+  testRunnerBtn: {
+    backgroundColor: "#0f172a",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+  },
+  testRunnerBtnText: {
+    color: "#38bdf8",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  roleDetailsGrid: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 6,
+    padding: 10,
+    gap: 4,
+  },
+  roleDetailItem: {
+    fontSize: 12,
+    color: "#334155",
   },
   emailText: {
     fontSize: 13,

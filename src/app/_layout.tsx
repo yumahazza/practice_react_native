@@ -35,6 +35,12 @@ export default function RootLayout() {
           title: "MMKV Test",
         }}
       />
+      <Stack.Screen
+        name="test-role"
+        options={{
+          title: "Skenario Pengujian Role",
+        }}
+      />
     </Stack>
   );
 }
