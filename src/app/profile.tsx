@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -92,9 +93,10 @@ export default function ProfilePage() {
 
   if (!sessionReady) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.loadingSafeArea}>
+        <StatusBar style="dark" />
         <View style={styles.loadingScreen}>
-          <ActivityIndicator size="small" color={COLORS.ink} />
+          <ActivityIndicator size="small" color={COLORS.primary} />
           <Text style={styles.loadingText}>Memuat informasi akun...</Text>
         </View>
       </SafeAreaView>
@@ -126,9 +128,11 @@ export default function ProfilePage() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+      <StatusBar style="light" />
       <AppShellHeader activeTab="profile" user={user} />
 
       <ScrollView
+        style={styles.bodyScroll}
         contentContainerStyle={styles.pageContent}
         showsVerticalScrollIndicator={false}
       >
@@ -295,6 +299,14 @@ export default function ProfilePage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: COLORS.purple,
+  },
+  loadingSafeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  bodyScroll: {
+    flex: 1,
     backgroundColor: COLORS.background,
   },
   loadingScreen: {
@@ -323,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1.5,
-    borderBottomColor: "rgba(34, 42, 42, 0.18)",
+    borderBottomColor: COLORS.hairline,
   },
   pageTitle: {
     fontFamily: FONTS.display,
@@ -338,7 +350,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
     lineHeight: 20,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
   },
   mainGrid: {
     flexDirection: "column",
@@ -375,14 +387,14 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1.5,
-    borderBottomColor: "rgba(34, 42, 42, 0.16)",
+    borderBottomColor: COLORS.hairline,
     marginBottom: SPACING.md,
   },
   avatarBox: {
     width: 56,
     height: 56,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.purple,
     borderWidth: 2,
     borderColor: COLORS.ink,
     justifyContent: "center",
@@ -393,7 +405,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.display,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 20,
-    color: COLORS.ink,
+    color: COLORS.mustard,
   },
   identityMeta: {
     flex: 1,
@@ -409,7 +421,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
     marginTop: 2,
   },
   roleSection: {
@@ -420,7 +432,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 11,
     letterSpacing: 0.7,
-    color: COLORS.rust,
+    color: COLORS.primary,
     marginBottom: 6,
   },
   roleBadge: {
@@ -434,10 +446,10 @@ const styles = StyleSheet.create({
     ...retroOffset("sm"),
   },
   roleBadgeSuperAdmin: {
-    backgroundColor: COLORS.orange,
+    backgroundColor: COLORS.mustard,
   },
   roleBadgeStandard: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
   },
   roleBadgeText: {
     fontFamily: FONTS.display,
@@ -474,12 +486,12 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.onPrimary,
   },
   logoutCardButton: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
-    borderColor: COLORS.coral,
+    backgroundColor: COLORS.inputSurface,
+    borderWidth: 2,
+    borderColor: COLORS.red,
     borderRadius: RADIUS.sm,
     minHeight: 44,
     justifyContent: "center",
@@ -488,19 +500,19 @@ const styles = StyleSheet.create({
     ...(WEB_POINTER || {}),
   },
   logoutCardButtonPressed: {
-    backgroundColor: COLORS.coralSurface,
+    backgroundColor: COLORS.redSurface,
   },
   logoutCardButtonText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 14,
-    color: COLORS.coralInk,
+    color: COLORS.redInk,
   },
   cardHeader: {
     marginBottom: SPACING.md,
     paddingBottom: 12,
     borderBottomWidth: 1.5,
-    borderBottomColor: "rgba(34, 42, 42, 0.16)",
+    borderBottomColor: COLORS.hairline,
   },
   cardTitle: {
     fontFamily: FONTS.display,
@@ -525,20 +537,20 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 11,
     letterSpacing: 0.6,
-    color: COLORS.rust,
+    color: COLORS.primary,
     marginBottom: 3,
   },
   infoValue: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.purple,
   },
   infoValueMono: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 13,
-    color: COLORS.ink,
+    color: COLORS.purple,
   },
   tokenRow: {
     flexDirection: "row",
@@ -549,7 +561,7 @@ const styles = StyleSheet.create({
   activeTokenBadge: {
     backgroundColor: COLORS.primarySurface,
     borderWidth: 1.5,
-    borderColor: COLORS.ink,
+    borderColor: COLORS.primary,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -558,7 +570,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 11,
-    color: COLORS.primaryInk,
+    color: COLORS.primary,
   },
   permList: {
     gap: 2,
@@ -569,7 +581,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(34, 42, 42, 0.14)",
+    borderBottomColor: COLORS.hairline,
     gap: 12,
   },
   permRowLast: {
@@ -591,9 +603,10 @@ const styles = StyleSheet.create({
   },
   permStatusAllowed: {
     backgroundColor: COLORS.primarySurface,
+    borderColor: COLORS.primary,
   },
   permStatusRestricted: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
   },
   permStatusText: {
     fontFamily: FONTS.body,
@@ -601,7 +614,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   permStatusTextAllowed: {
-    color: COLORS.primaryInk,
+    color: COLORS.primary,
   },
   permStatusTextRestricted: {
     color: COLORS.inkMuted,
@@ -610,7 +623,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     minHeight: 44,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
     borderColor: COLORS.ink,
     justifyContent: "center",

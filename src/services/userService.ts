@@ -195,6 +195,6 @@ export function getRolePermissions(role?: UserRole | string) {
     canManageRoles: isSuperAdmin,
     canAccessSystemSettings: isSuperAdmin,
     canRunTestSuite: true,
-    badgeColor: isSuperAdmin ? COLORS.orange : COLORS.primary,
+    badgeColor: isSuperAdmin ? COLORS.mustard : COLORS.primary,
   };
 }

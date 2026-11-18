@@ -131,7 +131,7 @@ export default function TestRoleScreen() {
             accessibilityState={{ disabled: isRunning, busy: isRunning }}
           >
             {isRunning ? (
-              <ActivityIndicator color={COLORS.ink} size="small" />
+              <ActivityIndicator color={COLORS.onPrimary} size="small" />
             ) : (
               <Text style={styles.runButtonText}>Jalankan Pengujian</Text>
             )}
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   roleHighlight: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
-    color: COLORS.rust,
+    color: COLORS.primary,
   },
   runButton: {
     backgroundColor: COLORS.primary,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   runButtonText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
-    color: COLORS.ink,
+    color: COLORS.onPrimary,
     fontSize: 15,
   },
   summaryBox: {
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primarySurface,
     borderWidth: 2,
-    borderColor: COLORS.ink,
+    borderColor: COLORS.primary,
   },
   summaryText: {
     fontFamily: FONTS.body,
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.display,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 11,
-    color: COLORS.rust,
+    color: COLORS.purple,
   },
   testTitle: {
     fontFamily: FONTS.body,
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 11,
-    color: COLORS.rust,
+    color: COLORS.primary,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
@@ -385,13 +385,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   textPass: {
-    color: COLORS.primaryInk,
+    color: COLORS.primary,
   },
   textFail: {
-    color: COLORS.coralInk,
+    color: COLORS.redInk,
   },
   detailsBlock: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
     padding: 10,
     borderRadius: RADIUS.sm,
     borderWidth: 1.5,
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 12,
-    color: COLORS.ink,
+    color: COLORS.purple,
     lineHeight: 18,
   },
   badge: {
@@ -417,24 +417,26 @@ const styles = StyleSheet.create({
   },
   passBadge: {
     backgroundColor: COLORS.primarySurface,
+    borderColor: COLORS.primary,
   },
   badgeTextPass: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
-    color: COLORS.primaryInk,
+    color: COLORS.primary,
     fontSize: 11,
   },
   failBadge: {
-    backgroundColor: COLORS.coralSurface,
+    backgroundColor: COLORS.redSurface,
+    borderColor: COLORS.red,
   },
   badgeTextFail: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
-    color: COLORS.coralInk,
+    color: COLORS.redInk,
     fontSize: 11,
   },
   runningBadge: {
-    backgroundColor: COLORS.orangeSurface,
+    backgroundColor: COLORS.mustard,
   },
   badgeTextRunning: {
     fontFamily: FONTS.body,
@@ -443,7 +445,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   pendingBadge: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
   },
   badgeTextPending: {
     fontFamily: FONTS.body,
@@ -458,7 +460,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     flex: 1,
-    backgroundColor: COLORS.ink,
+    backgroundColor: COLORS.purple,
     minHeight: 46,
     borderRadius: RADIUS.sm,
     justifyContent: "center",

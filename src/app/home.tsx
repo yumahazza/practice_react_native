@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { ComponentRef, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -226,13 +227,23 @@ export default function HomePage() {
         const originalNim = editingStudent.nim;
         const updated = await updateMahasiswa(originalId, originalNim, payload);
 
-        setMahasiswaList((prev) =>
-          deduplicateMahasiswa(
-            prev.map((m) =>
-              m.id === originalId || m.nim === originalNim ? updated : m
-            )
-          )
-        );
+        setMahasiswaList((prev) => {
+          let replaced = false;
+          const nextList = prev.map((m) => {
+            const isMatch =
+              (originalId && m.id === originalId) ||
+              (originalNim && String(m.nim).trim() === String(originalNim).trim());
+            if (isMatch) {
+              replaced = true;
+              return updated;
+            }
+            return m;
+          });
+          if (!replaced) {
+            nextList.unshift(updated);
+          }
+          return deduplicateMahasiswa(nextList);
+        });
 
         resetForm();
         showFeedback("success", `Data ${updated.nama} berhasil diperbarui.`);
@@ -297,20 +308,34 @@ export default function HomePage() {
 
   if (!sessionReady) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.loadingSafeArea}>
+        <StatusBar style="dark" />
         <View style={styles.loadingScreen}>
-          <ActivityIndicator size="small" color={COLORS.ink} />
+          <ActivityIndicator size="small" color={COLORS.primary} />
           <Text style={styles.loadingText}>Memuat data sesi...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const renderFieldError = (message?: string) => {
+    if (!message) return null;
+    return (
+      <View style={styles.inlineErrorRow} accessibilityLiveRegion="polite">
+        <View style={styles.inlineErrorMark}>
+          <Text style={styles.inlineErrorMarkText}>!</Text>
+        </View>
+        <Text style={styles.fieldErrorText}>{message}</Text>
+      </View>
+    );
+  };
+
   const cleanStudents = deduplicateMahasiswa(mahasiswaList);
   const isEditing = Boolean(editingStudent);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+      <StatusBar style="light" />
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -320,6 +345,7 @@ export default function HomePage() {
 
         <ScrollView
           ref={scrollViewRef}
+          style={styles.bodyScroll}
           contentContainerStyle={styles.pageContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -416,11 +442,7 @@ export default function HomePage() {
                       editable={!submitting}
                       accessibilityLabel="Nama"
                     />
-                    {fieldErrors.nama ? (
-                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
-                        {fieldErrors.nama}
-                      </Text>
-                    ) : null}
+                    {renderFieldError(fieldErrors.nama)}
                   </View>
 
                   {/* Field: NIM */}
@@ -448,11 +470,7 @@ export default function HomePage() {
                       editable={!submitting}
                       accessibilityLabel="NIM"
                     />
-                    {fieldErrors.nim ? (
-                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
-                        {fieldErrors.nim}
-                      </Text>
-                    ) : null}
+                    {renderFieldError(fieldErrors.nim)}
                   </View>
 
                   {/* Field: Angkatan */}
@@ -481,11 +499,7 @@ export default function HomePage() {
                       editable={!submitting}
                       accessibilityLabel="Angkatan"
                     />
-                    {fieldErrors.angkatan ? (
-                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
-                        {fieldErrors.angkatan}
-                      </Text>
-                    ) : null}
+                    {renderFieldError(fieldErrors.angkatan)}
                   </View>
 
                   {/* Field: Jurusan */}
@@ -512,11 +526,7 @@ export default function HomePage() {
                       editable={!submitting}
                       accessibilityLabel="Jurusan"
                     />
-                    {fieldErrors.jurusan ? (
-                      <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
-                        {fieldErrors.jurusan}
-                      </Text>
-                    ) : null}
+                    {renderFieldError(fieldErrors.jurusan)}
                   </View>
 
                   {/* Submit & Cancel Actions */}
@@ -534,7 +544,7 @@ export default function HomePage() {
                       accessibilityState={{ disabled: submitting, busy: submitting }}
                     >
                       {submitting ? (
-                        <ActivityIndicator size="small" color={COLORS.ink} />
+                        <ActivityIndicator size="small" color={COLORS.onPrimary} />
                       ) : (
                         <Text style={styles.submitButtonText}>
                           {isEditing ? "Simpan Perubahan" : "Tambah Mahasiswa"}
@@ -571,6 +581,11 @@ export default function HomePage() {
 
                 {cleanStudents.length === 0 ? (
                   <View style={styles.emptyCard}>
+                    <View style={styles.emptyGlyph}>
+                      <View style={styles.emptyGlyphBarLong} />
+                      <View style={styles.emptyGlyphBarMed} />
+                      <View style={styles.emptyGlyphBarShort} />
+                    </View>
                     <Text style={styles.emptyTitle}>Belum ada data mahasiswa</Text>
                     <Text style={styles.emptySubtitle}>
                       Tambahkan data mahasiswa pertama melalui form{" "}
@@ -588,7 +603,7 @@ export default function HomePage() {
 
                       return (
                         <View
-                          key={item.nim || item.id || item.nama}
+                          key={item.id || item.nim || item.nama}
                           style={[
                             styles.studentCard,
                             isBeingEdited && styles.studentCardActive,
@@ -716,7 +731,7 @@ export default function HomePage() {
                 accessibilityRole="button"
               >
                 {deleting ? (
-                  <ActivityIndicator size="small" color={COLORS.coralInk} />
+                  <ActivityIndicator size="small" color={COLORS.onRed} />
                 ) : (
                   <Text style={styles.modalConfirmDeleteText}>Hapus</Text>
                 )}
@@ -732,10 +747,19 @@ export default function HomePage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: COLORS.purple,
+  },
+  loadingSafeArea: {
+    flex: 1,
     backgroundColor: COLORS.background,
   },
   keyboardView: {
     flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  bodyScroll: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
   loadingScreen: {
     flex: 1,
@@ -765,7 +789,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1.5,
-    borderBottomColor: "rgba(34, 42, 42, 0.18)",
+    borderBottomColor: COLORS.hairline,
   },
   pageTitle: {
     fontFamily: FONTS.display,
@@ -780,7 +804,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
     lineHeight: 20,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
   },
 
   // Feedback Banner
@@ -790,7 +814,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: COLORS.primarySurface,
     borderWidth: 2,
-    borderColor: COLORS.ink,
+    borderColor: COLORS.primary,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -799,7 +823,8 @@ const styles = StyleSheet.create({
     ...retroOffset("sm"),
   },
   feedbackBannerInfo: {
-    backgroundColor: COLORS.orangeSurface,
+    backgroundColor: COLORS.mustardSurface,
+    borderColor: COLORS.ink,
   },
   feedbackLeft: {
     flexDirection: "row",
@@ -808,8 +833,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   feedbackAccent: {
-    width: 8,
-    height: 8,
+    width: 9,
+    height: 9,
     borderRadius: 2,
     backgroundColor: COLORS.primary,
     borderWidth: 1,
@@ -835,7 +860,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 12,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
     textDecorationLine: "underline",
   },
 
@@ -871,7 +896,7 @@ const styles = StyleSheet.create({
     ...retroOffset("md"),
   },
   formPanelEditing: {
-    borderColor: COLORS.primary,
+    borderColor: COLORS.orange,
   },
   formHeaderRow: {
     flexDirection: "row",
@@ -881,14 +906,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     paddingBottom: 12,
     borderBottomWidth: 1.5,
-    borderBottomColor: "rgba(34, 42, 42, 0.16)",
+    borderBottomColor: COLORS.hairline,
   },
   formSectionTag: {
     fontFamily: FONTS.display,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 11,
     letterSpacing: 0.7,
-    color: COLORS.rust,
+    color: COLORS.purple,
     marginBottom: 4,
   },
   formHeading: {
@@ -899,7 +924,7 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
   },
   editingPill: {
-    backgroundColor: COLORS.orangeSurface,
+    backgroundColor: COLORS.mustard,
     borderWidth: 1.5,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
@@ -928,7 +953,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
     color: COLORS.ink,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
@@ -937,18 +962,41 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputSurface,
+    ...retroOffset("sm", COLORS.primary),
   },
   inputError: {
-    borderColor: COLORS.coral,
+    borderColor: COLORS.red,
+  },
+  inlineErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 5,
+  },
+  inlineErrorMark: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    backgroundColor: COLORS.red,
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  inlineErrorMarkText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 11,
+    lineHeight: 13,
+    color: COLORS.onRed,
   },
   fieldErrorText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 12,
     lineHeight: 16,
-    color: COLORS.coralInk,
-    marginTop: 5,
+    color: COLORS.redInk,
+    flex: 1,
   },
   formActionsRow: {
     flexDirection: "row",
@@ -982,7 +1030,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.onPrimary,
   },
   cancelEditButton: {
     minHeight: 46,
@@ -1024,8 +1072,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     gap: 6,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
+    backgroundColor: COLORS.mustard,
+    borderWidth: 2,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 10,
@@ -1035,13 +1083,13 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.display,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
-    color: COLORS.rust,
+    color: COLORS.ink,
   },
   countLabel: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 12,
-    color: COLORS.inkMuted,
+    color: COLORS.ink,
   },
 
   // Empty State
@@ -1053,6 +1101,38 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: SPACING.lg,
     alignItems: "flex-start",
+  },
+  emptyGlyph: {
+    width: 44,
+    height: 36,
+    borderWidth: 2,
+    borderColor: COLORS.inkMuted,
+    borderRadius: RADIUS.sm,
+    padding: 6,
+    justifyContent: "space-between",
+    marginBottom: 12,
+    backgroundColor: COLORS.inputSurface,
+  },
+  emptyGlyphBarLong: {
+    height: 4,
+    width: "100%",
+    backgroundColor: COLORS.purple,
+    opacity: 0.45,
+    borderRadius: 1,
+  },
+  emptyGlyphBarMed: {
+    height: 4,
+    width: "72%",
+    backgroundColor: COLORS.primary,
+    opacity: 0.45,
+    borderRadius: 1,
+  },
+  emptyGlyphBarShort: {
+    height: 4,
+    width: "48%",
+    backgroundColor: COLORS.inkMuted,
+    opacity: 0.35,
+    borderRadius: 1,
   },
   emptyTitle: {
     fontFamily: FONTS.body,
@@ -1082,7 +1162,8 @@ const styles = StyleSheet.create({
     ...retroOffset("md"),
   },
   studentCardActive: {
-    borderColor: COLORS.primary,
+    borderColor: COLORS.orange,
+    ...retroOffset("md", COLORS.orange),
   },
   cardContentLayout: {
     gap: 14,
@@ -1115,8 +1196,10 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 11,
-    color: COLORS.primaryInk,
-    backgroundColor: COLORS.primarySurface,
+    color: COLORS.ink,
+    backgroundColor: COLORS.mustard,
+    borderWidth: 1,
+    borderColor: COLORS.ink,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: RADIUS.sm,
@@ -1138,14 +1221,14 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 11,
     letterSpacing: 0.6,
-    color: COLORS.rust,
+    color: COLORS.primary,
     marginBottom: 2,
   },
   metaValue: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.purple,
   },
 
   // Card Actions
@@ -1160,7 +1243,7 @@ const styles = StyleSheet.create({
   cardActionsMobile: {
     paddingTop: 10,
     borderTopWidth: 1.5,
-    borderTopColor: "rgba(34, 42, 42, 0.14)",
+    borderTopColor: COLORS.hairline,
   },
   editButton: {
     flexDirection: "row",
@@ -1168,9 +1251,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 74,
     paddingHorizontal: 12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
-    borderColor: COLORS.ink,
+    borderColor: COLORS.primary,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     gap: 6,
@@ -1181,7 +1264,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   editButtonPressed: {
-    backgroundColor: COLORS.surfacePressed,
+    backgroundColor: COLORS.primarySurface,
   },
   editAccentBar: {
     width: 6,
@@ -1193,28 +1276,28 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
-    color: COLORS.ink,
+    color: COLORS.primary,
   },
   deleteButton: {
     minHeight: 44,
     minWidth: 74,
     paddingHorizontal: 12,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
-    borderColor: COLORS.coral,
+    backgroundColor: COLORS.inputSurface,
+    borderWidth: 2,
+    borderColor: COLORS.red,
     borderRadius: RADIUS.sm,
     justifyContent: "center",
     alignItems: "center",
     ...(WEB_POINTER || {}),
   },
   deleteButtonPressed: {
-    backgroundColor: COLORS.coralSurface,
+    backgroundColor: COLORS.redSurface,
   },
   deleteButtonText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
-    color: COLORS.coralInk,
+    color: COLORS.redInk,
   },
 
   // Confirmation Dialog
@@ -1247,7 +1330,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
     lineHeight: 21,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
     marginBottom: SPACING.lg,
   },
   modalStudentName: {
@@ -1286,9 +1369,9 @@ const styles = StyleSheet.create({
     minWidth: 96,
     paddingHorizontal: 16,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.coralSurface,
+    backgroundColor: COLORS.red,
     borderWidth: 2,
-    borderColor: COLORS.coral,
+    borderColor: COLORS.ink,
     justifyContent: "center",
     alignItems: "center",
     ...retroOffset("sm"),
@@ -1301,6 +1384,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 14,
-    color: COLORS.coralInk,
+    color: COLORS.onRed,
   },
 });

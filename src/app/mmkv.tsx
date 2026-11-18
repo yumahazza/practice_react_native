@@ -49,7 +49,7 @@ export default function MMKVPage() {
             pressed && styles.primaryButtonPressed,
           ]}
         >
-          <Text style={styles.buttonText}>Save access token</Text>
+          <Text style={styles.primaryButtonText}>Save access token</Text>
         </Pressable>
         <Pressable
           onPress={getToken}
@@ -58,7 +58,7 @@ export default function MMKVPage() {
             pressed && styles.secondaryButtonPressed,
           ]}
         >
-          <Text style={styles.buttonText}>Get access token</Text>
+          <Text style={styles.secondaryButtonText}>Get access token</Text>
         </Pressable>
         <Text style={styles.result}>Value: {savedToken ?? "Belum diambil"}</Text>
       </View>
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 15,
     color: COLORS.ink,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputSurface,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
     borderWidth: 2,
@@ -117,8 +117,15 @@ const styles = StyleSheet.create({
   primaryButtonPressed: {
     backgroundColor: COLORS.primaryPressed,
   },
+  primaryButtonText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 14,
+    color: COLORS.onPrimary,
+    textAlign: "center",
+  },
   secondaryButton: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
@@ -132,7 +139,7 @@ const styles = StyleSheet.create({
   secondaryButtonPressed: {
     backgroundColor: COLORS.surfacePressed,
   },
-  buttonText: {
+  secondaryButtonText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 14,

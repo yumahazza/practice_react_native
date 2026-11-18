@@ -311,7 +311,7 @@ export default function LoginPage() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingScreen}>
-          <ActivityIndicator size="small" color={COLORS.ink} />
+          <ActivityIndicator size="small" color={COLORS.primary} />
           <Text style={styles.loadingLabel}>Memeriksa sesi tersimpan...</Text>
         </View>
       </SafeAreaView>
@@ -376,9 +376,12 @@ export default function LoginPage() {
                   accessibilityLabel="Username"
                 />
                 {usernameError ? (
-                  <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
-                    {usernameError}
-                  </Text>
+                  <View style={styles.inlineErrorRow} accessibilityLiveRegion="polite">
+                    <View style={styles.inlineErrorMark}>
+                      <Text style={styles.inlineErrorMarkText}>!</Text>
+                    </View>
+                    <Text style={styles.fieldErrorText}>{usernameError}</Text>
+                  </View>
                 ) : null}
               </View>
 
@@ -434,15 +437,21 @@ export default function LoginPage() {
                   </Pressable>
                 </View>
                 {passwordError ? (
-                  <Text style={styles.fieldErrorText} accessibilityLiveRegion="polite">
-                    {passwordError}
-                  </Text>
+                  <View style={styles.inlineErrorRow} accessibilityLiveRegion="polite">
+                    <View style={styles.inlineErrorMark}>
+                      <Text style={styles.inlineErrorMarkText}>!</Text>
+                    </View>
+                    <Text style={styles.fieldErrorText}>{passwordError}</Text>
+                  </View>
                 ) : null}
               </View>
 
               {/* Auth-level error */}
               {authError ? (
                 <View style={styles.authErrorBox} accessibilityLiveRegion="polite">
+                  <View style={styles.inlineErrorMark}>
+                    <Text style={styles.inlineErrorMarkText}>!</Text>
+                  </View>
                   <Text style={styles.authErrorText}>{authError}</Text>
                 </View>
               ) : null}
@@ -460,7 +469,7 @@ export default function LoginPage() {
                 accessibilityState={{ disabled: isBusy, busy: submittingAction === "manual" }}
               >
                 {submittingAction === "manual" ? (
-                  <ActivityIndicator size="small" color={COLORS.ink} />
+                  <ActivityIndicator size="small" color={COLORS.onPrimary} />
                 ) : (
                   <Text style={styles.primaryButtonText}>Sign In</Text>
                 )}
@@ -556,7 +565,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.orange,
+    backgroundColor: COLORS.purple,
     borderWidth: 2,
     borderColor: COLORS.ink,
     justifyContent: "center",
@@ -564,17 +573,17 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   brandDot: {
-    width: 6,
-    height: 6,
+    width: 7,
+    height: 7,
     borderRadius: 2,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.mustard,
   },
   brandName: {
     fontFamily: FONTS.display,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
     letterSpacing: 0.6,
-    color: COLORS.rust,
+    color: COLORS.purple,
   },
   headerBlock: {
     marginBottom: SPACING.lg,
@@ -592,7 +601,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 15,
     lineHeight: 22,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
   },
   card: {
     backgroundColor: COLORS.surface,
@@ -617,7 +626,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 15,
     color: COLORS.ink,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
@@ -627,7 +636,7 @@ const styles = StyleSheet.create({
   passwordWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
@@ -659,30 +668,56 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 12,
-    color: COLORS.rust,
+    color: COLORS.primary,
   },
   inputFocused: {
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputSurface,
+    ...retroOffset("sm", COLORS.primary),
   },
   inputError: {
-    borderColor: COLORS.coral,
+    borderColor: COLORS.red,
   },
   inputDisabled: {
     opacity: 0.65,
+  },
+  inlineErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  inlineErrorMark: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    backgroundColor: COLORS.red,
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  inlineErrorMarkText: {
+    fontFamily: FONTS.body,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 11,
+    lineHeight: 13,
+    color: COLORS.onRed,
   },
   fieldErrorText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 12,
     lineHeight: 16,
-    color: COLORS.coralInk,
-    marginTop: 5,
+    color: COLORS.redInk,
+    flex: 1,
   },
   authErrorBox: {
-    backgroundColor: COLORS.coralSurface,
-    borderWidth: 1.5,
-    borderColor: COLORS.coral,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: COLORS.redSurface,
+    borderWidth: 2,
+    borderColor: COLORS.red,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -693,7 +728,8 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 13,
     lineHeight: 18,
-    color: COLORS.coralInk,
+    color: COLORS.redInk,
+    flex: 1,
   },
   primaryButton: {
     backgroundColor: COLORS.primary,
@@ -717,7 +753,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 15,
-    color: COLORS.ink,
+    color: COLORS.onPrimary,
   },
   dividerRow: {
     flexDirection: "row",
@@ -727,18 +763,17 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1.5,
-    backgroundColor: COLORS.ink,
-    opacity: 0.25,
+    backgroundColor: COLORS.hairline,
   },
   dividerText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 12,
-    color: COLORS.inkMuted,
+    color: COLORS.purple,
     paddingHorizontal: 12,
   },
   googleButton: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputSurface,
     borderWidth: 2,
     borderColor: COLORS.ink,
     minHeight: 48,
@@ -768,7 +803,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 13,
-    color: COLORS.primaryInk,
+    color: COLORS.primary,
     textDecorationLine: "underline",
   },
   helperText: {

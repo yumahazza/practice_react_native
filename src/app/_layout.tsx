@@ -57,13 +57,14 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: COLORS.background },
-          headerTintColor: COLORS.ink,
+          headerStyle: { backgroundColor: COLORS.purple },
+          headerTintColor: COLORS.onPurple,
           headerShadowVisible: false,
           headerTitleStyle: {
             fontFamily: FONTS.display,
             fontWeight: FONT_WEIGHTS.regular,
             fontSize: 15,
+            color: COLORS.onPurple,
           },
           contentStyle: { backgroundColor: COLORS.background },
         }}

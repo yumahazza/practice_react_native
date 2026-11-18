@@ -68,7 +68,14 @@ export function AppShellHeader({ activeTab, user }: AppShellHeaderProps) {
         accessibilityRole="tab"
         accessibilityState={{ selected: activeTab === "home" }}
       >
-        <Text style={styles.navItemText}>Data Mahasiswa</Text>
+        <Text
+          style={[
+            styles.navItemText,
+            activeTab === "home" && styles.navItemTextActive,
+          ]}
+        >
+          Data Mahasiswa
+        </Text>
       </Pressable>
 
       <Pressable
@@ -82,7 +89,14 @@ export function AppShellHeader({ activeTab, user }: AppShellHeaderProps) {
         accessibilityRole="tab"
         accessibilityState={{ selected: activeTab === "profile" }}
       >
-        <Text style={styles.navItemText}>Profile</Text>
+        <Text
+          style={[
+            styles.navItemText,
+            activeTab === "profile" && styles.navItemTextActive,
+          ]}
+        >
+          Profile
+        </Text>
       </Pressable>
     </View>
   );
@@ -143,23 +157,28 @@ export function AppShellHeader({ activeTab, user }: AppShellHeaderProps) {
 
         {isCompact ? <View style={styles.compactNavRow}>{navMenu}</View> : null}
       </View>
+      <View style={styles.headerAccentRule} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   topHeaderBar: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.purple,
     borderBottomWidth: 2,
     borderBottomColor: COLORS.ink,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 12,
   },
   topHeaderInner: {
     width: "100%",
     maxWidth: 1120,
     alignSelf: "center",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
     gap: 10,
+  },
+  headerAccentRule: {
+    height: 3,
+    backgroundColor: COLORS.mustard,
   },
   topRow: {
     flexDirection: "row",
@@ -193,14 +212,14 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 2,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.onPurple,
   },
   logoText: {
     fontFamily: FONTS.display,
     fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
     letterSpacing: 0.5,
-    color: COLORS.ink,
+    color: COLORS.onPurple,
   },
   navGroup: {
     flexDirection: "row",
@@ -214,8 +233,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
     paddingHorizontal: 14,
     borderRadius: RADIUS.sm,
-    borderWidth: 2,
-    borderColor: COLORS.ink,
+    borderWidth: 1.5,
     justifyContent: "center",
     alignItems: "center",
     ...(WEB_POINTER || {}),
@@ -226,19 +244,25 @@ const styles = StyleSheet.create({
   },
   navItemActive: {
     backgroundColor: COLORS.primary,
-    ...retroOffset("sm"),
+    borderWidth: 2,
+    borderColor: COLORS.mustard,
+    ...retroOffset("sm", COLORS.ink),
   },
   navItemIdle: {
-    backgroundColor: COLORS.background,
+    backgroundColor: "transparent",
+    borderColor: COLORS.headerBorderSubtle,
   },
   navItemPressed: {
-    backgroundColor: COLORS.surfacePressed,
+    backgroundColor: COLORS.purplePressed,
   },
   navItemText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 13,
-    color: COLORS.ink,
+    color: COLORS.onPurple,
+  },
+  navItemTextActive: {
+    color: COLORS.onPrimary,
   },
   compactNavRow: {
     width: "100%",
@@ -260,17 +284,17 @@ const styles = StyleSheet.create({
     ...(WEB_POINTER || {}),
   },
   identityChipPressed: {
-    backgroundColor: COLORS.surfacePressed,
+    backgroundColor: COLORS.purplePressed,
   },
   greetingText: {
     fontFamily: FONTS.body,
     fontWeight: FONT_WEIGHTS.bold,
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.onPurple,
     maxWidth: 160,
   },
   superAdminTag: {
-    backgroundColor: COLORS.orange,
+    backgroundColor: COLORS.mustard,
     borderWidth: 1.5,
     borderColor: COLORS.ink,
     borderRadius: RADIUS.sm,
@@ -284,25 +308,24 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
   },
   logoutButton: {
-    minHeight: 40,
-    paddingHorizontal: 14,
+    minHeight: 38,
+    paddingHorizontal: 13,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
-    borderWidth: 2,
-    borderColor: COLORS.ink,
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: COLORS.headerBorderSubtle,
     justifyContent: "center",
     alignItems: "center",
-    ...retroOffset("sm"),
     ...(WEB_POINTER || {}),
   },
   logoutButtonPressed: {
-    backgroundColor: COLORS.coralSurface,
-    borderColor: COLORS.coral,
+    backgroundColor: COLORS.purplePressed,
+    borderColor: COLORS.orange,
   },
   logoutButtonText: {
     fontFamily: FONTS.body,
-    fontWeight: FONT_WEIGHTS.bold,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 13,
-    color: COLORS.coralInk,
+    color: COLORS.onPurple,
   },
 });

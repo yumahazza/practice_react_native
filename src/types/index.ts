@@ -22,4 +22,5 @@ export interface Mahasiswa {
   jurusan: string;
   angkatan: string;
   createdAt?: string;
+  updatedAt?: string;
 }
