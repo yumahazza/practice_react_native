@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { UserProfile, AuthSession } from "../types";
+import { resolveCanonicalUsername } from "./userService";
 
 export const TOKEN_KEY = "@firebase_login_token";
 export const USER_KEY = "@firebase_login_user";
@@ -111,7 +112,12 @@ export async function getAuthSession(): Promise<AuthSession> {
       return { token: null, user: null };
     }
 
-    return { token, user };
+    const normalizedUser: UserProfile = {
+      ...user,
+      displayName: resolveCanonicalUsername(user.email, user.displayName),
+    };
+
+    return { token, user: normalizedUser };
   } catch (error) {
     console.error("[AuthStorage] Gagal membaca sesi:", error);
     return { token: null, user: null };

@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { ComponentRef, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,7 +12,16 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../config/firebaseConfig";
+import {
+  COLORS,
+  FONTS,
+  FONT_WEIGHTS,
+  RADIUS,
+  SPACING,
+  WEB_POINTER,
+} from "../constants/theme";
 import { clearAuthSession, getAuthSession } from "../services/authStorage";
 import {
   addMahasiswa,
@@ -21,8 +31,14 @@ import {
 } from "../services/mahasiswaService";
 import { Mahasiswa, UserProfile } from "../types";
 
+type ActiveHomeField = "nim" | "angkatan" | "nama" | "jurusan" | null;
+
 export default function HomePage() {
   const router = useRouter();
+  const angkatanRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const namaRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const jurusanRef = useRef<ComponentRef<typeof TextInput>>(null);
+
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [mahasiswaList, setMahasiswaList] = useState<Mahasiswa[]>([]);
@@ -32,17 +48,16 @@ export default function HomePage() {
   const [nama, setNama] = useState("");
   const [jurusan, setJurusan] = useState("");
   const [angkatan, setAngkatan] = useState("");
+  const [focusedField, setFocusedField] = useState<ActiveHomeField>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // 1. Verifikasi Sesi Token di Local Storage saat halaman dimuat
   useEffect(() => {
     let isMounted = true;
 
     async function checkAuth() {
       const session = await getAuthSession();
       if (!session.token || !session.user) {
-        console.log("[Home] Tidak ada sesi token. Mengalihkan ke login...");
         if (Platform.OS === "web") {
           window.location.href = "/";
         } else if (isMounted) {
@@ -64,12 +79,11 @@ export default function HomePage() {
     };
   }, [router]);
 
-  // 2. Berlangganan Data Mahasiswa (Realtime Firestore & Lokal)
   useEffect(() => {
     if (!sessionReady) return;
 
     const unsubscribe = subscribeMahasiswaList((data) => {
-      setMahasiswaList(data);
+      setMahasiswaList(deduplicateMahasiswa(data));
     });
 
     return () => {
@@ -77,32 +91,19 @@ export default function HomePage() {
     };
   }, [sessionReady]);
 
-  /**
-   * TOMBOL KELUAR / LOGOUT:
-   * Eksekusi sinkron dan langsung membersihkan seluruh storage
-   * lalu mengarahkan seketika ke halaman login tanpa menunggu respon server.
-   */
   const handleLogout = () => {
-    console.log("[Auth] Memulai proses logout...");
-
-    // 1. Bersihkan localStorage di browser langsung
     try {
       if (typeof window !== "undefined" && window.localStorage) {
         window.localStorage.clear();
       }
-    } catch (_) {}
+    } catch {}
 
-    // 2. Bersihkan AsyncStorage & MMKV
     clearAuthSession().catch(() => {});
 
-    // 3. Sign out dari Firebase Auth di latar belakang
     try {
       signOut(auth).catch(() => {});
-    } catch (_) {}
+    } catch {}
 
-    console.log("[Auth] Storage bersih. Mengarahkan ke halaman login...");
-
-    // 4. Langsung alihkan ke login seketika
     if (Platform.OS === "web") {
       window.location.href = "/";
     } else {
@@ -110,14 +111,11 @@ export default function HomePage() {
     }
   };
 
-  /**
-   * KETENTUAN 4:
-   * Input data mahasiswa ke database.
-   * Menambahkan data baru ke daftar (bertambah, tidak menimpa data sebelumnya).
-   */
   const handleAdd = async () => {
+    if (submitting) return;
+
     if (!nim.trim() || !nama.trim() || !jurusan.trim() || !angkatan.trim()) {
-      setFormError("Semua kolom (NIM, Nama, Jurusan, Angkatan) wajib diisi.");
+      setFormError("Lengkapi NIM, angkatan, nama lengkap, dan jurusan terlebih dahulu.");
       return;
     }
 
@@ -132,24 +130,19 @@ export default function HomePage() {
         angkatan: angkatan.trim(),
       });
 
-      // Tambahkan item baru dan pastikan bebas duplikat berdasarkan NIM & Nama
       setMahasiswaList((prev) => deduplicateMahasiswa([added, ...prev]));
 
-      // Reset form input
       setNim("");
       setNama("");
       setJurusan("");
       setAngkatan("");
     } catch (err: any) {
-      setFormError(err?.message || "Gagal menyimpan data.");
+      setFormError(err?.message || "Gagal menyimpan data mahasiswa.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  /**
-   * Hapus data mahasiswa
-   */
   const handleDelete = async (id?: string, studentNim?: string) => {
     if (!id) return;
     await deleteMahasiswa(id, studentNim);
@@ -164,372 +157,553 @@ export default function HomePage() {
 
   if (!sessionReady) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0052cc" />
-        <Text style={styles.loadingText}>Memeriksa sesi akun...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingScreen}>
+          <ActivityIndicator size="small" color={COLORS.ink} />
+          <Text style={styles.loadingText}>Memuat data sesi...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        {/* Header Bar */}
-        <View style={styles.headerBar}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={styles.greetingText}>
-                Halo, {user?.displayName || "Mahasiswa"}
-              </Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleBadgeText}>
-                  {user?.role || "Super Admin"}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.emailText}>{user?.email || "Akun Terverifikasi"}</Text>
+  const providerLabel = user?.providerId === "google.com" ? "Google" : "Manual";
+  const cleanStudents = deduplicateMahasiswa(mahasiswaList);
+
+  const renderHeader = () => (
+    <View style={styles.headerWrapper}>
+      {/* Sapaan & Identitas Pengguna */}
+      <View style={styles.topBar}>
+        <View style={styles.identityBlock}>
+          <View style={styles.statusLine}>
+            <View style={styles.statusDotPrimary} />
+            <Text style={styles.statusText}>Sesi aktif · {providerLabel}</Text>
+            {user?.role ? (
+              <>
+                <Text style={styles.statusSeparator}>/</Text>
+                <View style={styles.statusDotHighlight} />
+                <Text style={styles.roleHighlightText}>{user.role}</Text>
+              </>
+            ) : null}
           </View>
-
-          <Pressable
-            style={styles.logoutButton}
-            onPress={handleLogout}
-            accessibilityRole="button"
-          >
-            <Text style={styles.logoutButtonText}>Keluar</Text>
-          </Pressable>
-        </View>
-
-        {/* Panel Identitas Akun & Role Super Admin */}
-        <View style={styles.roleInfoCard}>
-          <View style={styles.roleInfoHead}>
-            <Text style={styles.roleInfoTitle}>👑 Status Akses: Super Admin</Text>
-            <Pressable
-              style={styles.testRunnerBtn}
-              onPress={() => router.push("/test-role" as any)}
-            >
-              <Text style={styles.testRunnerBtnText}>🧪 Jalankan Pengujian</Text>
-            </Pressable>
-          </View>
-          <View style={styles.roleDetailsGrid}>
-            <Text style={styles.roleDetailItem}>
-              <Text style={{ fontWeight: "bold" }}>UID Akun:</Text> {user?.uid || "-"}
-            </Text>
-            <Text style={styles.roleDetailItem}>
-              <Text style={{ fontWeight: "bold" }}>Metode Login:</Text>{" "}
-              {user?.providerId === "google.com" ? "Google OAuth" : "Email & Password"}
-            </Text>
-            <Text style={styles.roleDetailItem}>
-              <Text style={{ fontWeight: "bold" }}>Hak Akses:</Text> Full CRUD Mahasiswa & Role Management
-            </Text>
-          </View>
-        </View>
-
-        {/* Form Input Mahasiswa (Ketentuan 4) */}
-        <View style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Input Data Mahasiswa</Text>
-
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="NIM"
-              value={nim}
-              onChangeText={setNim}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Nama Lengkap"
-              value={nama}
-              onChangeText={setNama}
-            />
-          </View>
-
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="Jurusan / Program Studi"
-              value={jurusan}
-              onChangeText={setJurusan}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Tahun Angkatan"
-              value={angkatan}
-              onChangeText={setAngkatan}
-              keyboardType="numeric"
-            />
-          </View>
-
-          {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-
-          <Pressable
-            style={[styles.saveButton, submitting && styles.disabledButton]}
-            onPress={handleAdd}
-            disabled={submitting}
-            accessibilityRole="button"
-          >
-            {submitting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.saveButtonText}>Simpan Mahasiswa</Text>
-            )}
-          </Pressable>
-        </View>
-
-        {/* KETENTUAN 5: Tampilan List Mahasiswa yang ada pada database */}
-        <View style={styles.listSection}>
-          <Text style={styles.sectionTitle}>
-            Daftar Mahasiswa ({mahasiswaList.length})
+          <Text style={styles.greetingText} numberOfLines={1}>
+            Halo, {user?.displayName || "Mahasiswa"}
           </Text>
+          <Text style={styles.emailText} numberOfLines={1}>
+            {user?.email || "Akun terverifikasi"}
+          </Text>
+        </View>
 
-          <FlatList
-            data={deduplicateMahasiswa(mahasiswaList)}
-            keyExtractor={(item, index) => item.nim || item.id || `mhs-${index}`}
-            contentContainerStyle={styles.listContainer}
-            renderItem={({ item }) => (
-              <View style={styles.studentItem}>
-                <View style={styles.studentInfo}>
-                  <Text style={styles.studentName}>
-                    {item.nim} - {item.nama}
-                  </Text>
-                  <Text style={styles.studentMeta}>
-                    {item.jurusan} | Angkatan {item.angkatan}
-                  </Text>
-                </View>
+        <Pressable
+          onPress={handleLogout}
+          style={({ pressed }) => [
+            styles.logoutButton,
+            pressed && styles.logoutButtonPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Keluar dari akun"
+        >
+          <Text style={styles.logoutButtonText}>Keluar</Text>
+        </Pressable>
+      </View>
 
-                <Pressable
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(item.id, item.nim)}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.deleteButtonText}>Hapus</Text>
-                </Pressable>
-              </View>
-            )}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>Tidak ada data mahasiswa.</Text>
-            }
+      {/* Satu Kelompok Mandiri: Form Input Data Mahasiswa */}
+      <View style={styles.formSurface}>
+        <View style={styles.formHeader}>
+          <Text style={styles.formTitle}>Tambah Mahasiswa</Text>
+          <Text style={styles.formSubtitle}>
+            Data baru langsung tersinkron ke daftar mahasiswa.
+          </Text>
+        </View>
+
+        <View style={styles.rowPair}>
+          <View style={styles.colNim}>
+            <Text style={styles.inputLabel}>NIM</Text>
+            <TextInput
+              style={[styles.input, focusedField === "nim" && styles.inputFocused]}
+              placeholder="Contoh: 1201223045"
+              placeholderTextColor={COLORS.inkMuted}
+              value={nim}
+              onChangeText={(val) => {
+                setNim(val);
+                if (formError) setFormError(null);
+              }}
+              onFocus={() => setFocusedField("nim")}
+              onBlur={() => setFocusedField(null)}
+              keyboardType="numeric"
+              returnKeyType="next"
+              onSubmitEditing={() => angkatanRef.current?.focus()}
+              editable={!submitting}
+            />
+          </View>
+
+          <View style={styles.colAngkatan}>
+            <Text style={styles.inputLabel}>Angkatan</Text>
+            <TextInput
+              ref={angkatanRef}
+              style={[
+                styles.input,
+                focusedField === "angkatan" && styles.inputFocused,
+              ]}
+              placeholder="2024"
+              placeholderTextColor={COLORS.inkMuted}
+              value={angkatan}
+              onChangeText={(val) => {
+                setAngkatan(val);
+                if (formError) setFormError(null);
+              }}
+              onFocus={() => setFocusedField("angkatan")}
+              onBlur={() => setFocusedField(null)}
+              keyboardType="numeric"
+              returnKeyType="next"
+              onSubmitEditing={() => namaRef.current?.focus()}
+              editable={!submitting}
+            />
+          </View>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Nama Lengkap</Text>
+          <TextInput
+            ref={namaRef}
+            style={[styles.input, focusedField === "nama" && styles.inputFocused]}
+            placeholder="Masukkan nama mahasiswa"
+            placeholderTextColor={COLORS.inkMuted}
+            value={nama}
+            onChangeText={(val) => {
+              setNama(val);
+              if (formError) setFormError(null);
+            }}
+            onFocus={() => setFocusedField("nama")}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="next"
+            onSubmitEditing={() => jurusanRef.current?.focus()}
+            editable={!submitting}
           />
         </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Jurusan / Program Studi</Text>
+          <TextInput
+            ref={jurusanRef}
+            style={[
+              styles.input,
+              focusedField === "jurusan" && styles.inputFocused,
+            ]}
+            placeholder="Contoh: S1 Rekayasa Perangkat Lunak"
+            placeholderTextColor={COLORS.inkMuted}
+            value={jurusan}
+            onChangeText={(val) => {
+              setJurusan(val);
+              if (formError) setFormError(null);
+            }}
+            onFocus={() => setFocusedField("jurusan")}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="done"
+            onSubmitEditing={handleAdd}
+            editable={!submitting}
+          />
+        </View>
+
+        {formError ? (
+          <View style={styles.errorBanner} accessibilityLiveRegion="polite">
+            <Text style={styles.errorText}>{formError}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={handleAdd}
+          disabled={submitting}
+          style={({ pressed }) => [
+            styles.saveButton,
+            pressed && !submitting && styles.saveButtonPressed,
+            submitting && styles.buttonDisabled,
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: submitting, busy: submitting }}
+        >
+          {submitting ? (
+            <ActivityIndicator color={COLORS.ink} size="small" />
+          ) : (
+            <Text style={styles.saveButtonText}>Simpan Mahasiswa</Text>
+          )}
+        </Pressable>
+      </View>
+
+      {/* Header Daftar Mahasiswa */}
+      <View style={styles.listHeaderRow}>
+        <Text style={styles.listTitle}>Daftar Mahasiswa</Text>
+        <Text style={styles.listCount}>{cleanStudents.length} tercatat</Text>
       </View>
     </View>
+  );
+
+  const renderFooter = () => (
+    <View style={styles.footerBlock}>
+      <Pressable
+        onPress={() => router.push("/test-role" as any)}
+        style={styles.footerLinkButton}
+        accessibilityRole="button"
+      >
+        <Text style={styles.footerLinkText}>Verifikasi integritas role akun</Text>
+      </Pressable>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <FlatList
+          data={cleanStudents}
+          keyExtractor={(item, index) => item.nim || item.id || `mhs-${index}`}
+          ListHeaderComponent={renderHeader()}
+          ListFooterComponent={renderFooter()}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <View style={styles.studentRow}>
+              <View style={styles.studentInfo}>
+                <Text style={styles.studentName}>{item.nama}</Text>
+                <Text style={styles.studentMeta}>
+                  {item.nim} · {item.jurusan} · Angkatan {item.angkatan}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() => handleDelete(item.id, item.nim)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  pressed && styles.deleteButtonPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Hapus ${item.nama}`}
+              >
+                <Text style={styles.deleteButtonText}>Hapus</Text>
+              </Pressable>
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>Belum ada data mahasiswa tersimpan.</Text>
+            </View>
+          }
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#f4f5f7",
-    alignItems: "center",
+    backgroundColor: COLORS.background,
   },
-  content: {
-    width: "100%",
-    maxWidth: 680,
+  keyboardView: {
     flex: 1,
-    padding: 16,
   },
-  centerContainer: {
+  loadingScreen: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f4f5f7",
+    gap: SPACING.sm,
   },
   loadingText: {
-    marginTop: 12,
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
-    color: "#5e6c84",
+    color: COLORS.inkMuted,
   },
-  headerBar: {
+  listContent: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  headerWrapper: {
+    marginBottom: SPACING.xs,
+  },
+  topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: SPACING.md,
+    paddingBottom: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    marginBottom: SPACING.lg,
+  },
+  identityBlock: {
+    flex: 1,
+  },
+  statusLine: {
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#dfe1e6",
-    marginBottom: 16,
+    flexWrap: "wrap",
+    marginBottom: 6,
+  },
+  statusDotPrimary: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
+    marginRight: 6,
+  },
+  statusText: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 12,
+    color: COLORS.inkMuted,
+  },
+  statusSeparator: {
+    fontFamily: FONTS.family,
+    fontSize: 12,
+    color: COLORS.border,
+    marginHorizontal: 6,
+  },
+  statusDotHighlight: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: COLORS.orange,
+    marginRight: 6,
+  },
+  roleHighlightText: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    fontSize: 12,
+    color: COLORS.orangeInk,
   },
   greetingText: {
-    fontSize: 17,
-    fontWeight: "bold",
-    color: "#172b4d",
-  },
-  roleBadge: {
-    backgroundColor: "#fef3c7",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#f59e0b",
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: "bold",
-    color: "#b45309",
-  },
-  roleInfoCard: {
-    backgroundColor: "#ffffff",
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginBottom: 16,
-  },
-  roleInfoHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  roleInfoTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#0f172a",
-  },
-  testRunnerBtn: {
-    backgroundColor: "#0f172a",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
-  },
-  testRunnerBtnText: {
-    color: "#38bdf8",
-    fontSize: 11,
-    fontWeight: "bold",
-  },
-  roleDetailsGrid: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 6,
-    padding: 10,
-    gap: 4,
-  },
-  roleDetailItem: {
-    fontSize: 12,
-    color: "#334155",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 24,
+    lineHeight: 30,
+    color: COLORS.ink,
   },
   emailText: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
-    color: "#5e6c84",
+    lineHeight: 19,
+    color: COLORS.inkMuted,
     marginTop: 2,
   },
   logoutButton: {
-    backgroundColor: "#ffebe6",
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 6,
+    minHeight: 44,
+    minWidth: 72,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: "#ffbdad",
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    ...(WEB_POINTER || {}),
+  },
+  logoutButtonPressed: {
+    backgroundColor: COLORS.coralSurface,
+    borderColor: COLORS.coral,
   },
   logoutButtonText: {
-    color: "#de350b",
-    fontSize: 14,
-    fontWeight: "bold",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    fontSize: 13,
+    color: COLORS.coralInk,
   },
-  formCard: {
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 8,
+  formSurface: {
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "#dfe1e6",
-    marginBottom: 16,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
   },
-  sectionTitle: {
+  formHeader: {
+    marginBottom: SPACING.md,
+  },
+  formTitle: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#172b4d",
+    lineHeight: 22,
+    color: COLORS.ink,
+  },
+  formSubtitle: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLORS.inkMuted,
+    marginTop: 2,
+  },
+  rowPair: {
+    flexDirection: "row",
+    gap: SPACING.sm,
     marginBottom: 12,
   },
-  formRow: {
-    flexDirection: Platform.OS === "web" ? "row" : "column",
-    gap: 10,
-    marginBottom: 10,
+  colNim: {
+    flex: 1.4,
+  },
+  colAngkatan: {
+    flex: 1,
+  },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 12,
+    color: COLORS.ink,
+    marginBottom: 4,
   },
   input: {
-    flex: 1,
-    backgroundColor: "#fafbfc",
-    borderWidth: 1,
-    borderColor: "#dfe1e6",
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
-    color: "#172b4d",
+    color: COLORS.ink,
+    backgroundColor: COLORS.surfaceInput,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 12,
+    minHeight: 44,
+  },
+  inputFocused: {
+    borderColor: COLORS.primary,
+  },
+  errorBanner: {
+    backgroundColor: COLORS.coralSurface,
+    borderWidth: 1,
+    borderColor: COLORS.coral,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
   },
   errorText: {
-    color: "#de350b",
-    fontSize: 13,
-    marginBottom: 10,
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 12,
+    lineHeight: 17,
+    color: COLORS.coralInk,
   },
   saveButton: {
-    backgroundColor: "#0052cc",
-    paddingVertical: 10,
-    borderRadius: 6,
+    backgroundColor: COLORS.primary,
+    minHeight: 46,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
     alignItems: "center",
     marginTop: 4,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+    ...(WEB_POINTER || {}),
   },
-  disabledButton: {
-    opacity: 0.6,
+  saveButtonPressed: {
+    backgroundColor: COLORS.primaryPressed,
+  },
+  buttonDisabled: {
+    opacity: 0.65,
   },
   saveButtonText: {
-    color: "#ffffff",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 14,
-    fontWeight: "600",
+    color: COLORS.ink,
   },
-  listSection: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#dfe1e6",
+  listHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  listContainer: {
-    paddingBottom: 16,
+  listTitle: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    fontSize: 17,
+    color: COLORS.ink,
   },
-  studentItem: {
+  listCount: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 13,
+    color: COLORS.inkMuted,
+  },
+  studentRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#ebecf0",
+    borderBottomColor: COLORS.border,
+    gap: SPACING.sm,
   },
   studentInfo: {
     flex: 1,
   },
   studentName: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 15,
-    fontWeight: "600",
-    color: "#172b4d",
+    lineHeight: 20,
+    color: COLORS.ink,
   },
   studentMeta: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
-    color: "#5e6c84",
+    lineHeight: 19,
+    color: COLORS.inkMuted,
     marginTop: 2,
   },
   deleteButton: {
-    backgroundColor: "#f4f5f7",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "#dfe1e6",
-    marginLeft: 10,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+    minHeight: 44,
+    minWidth: 56,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    ...(WEB_POINTER || {}),
+  },
+  deleteButtonPressed: {
+    backgroundColor: COLORS.coralSurface,
   },
   deleteButtonText: {
-    color: "#de350b",
-    fontSize: 12,
-    fontWeight: "500",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 13,
+    color: COLORS.coralInk,
+  },
+  emptyBox: {
+    paddingVertical: SPACING.xl,
+    alignItems: "center",
   },
   emptyText: {
-    textAlign: "center",
-    color: "#5e6c84",
-    marginTop: 24,
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 14,
+    color: COLORS.inkMuted,
+  },
+  footerBlock: {
+    paddingTop: SPACING.lg,
+    alignItems: "flex-start",
+  },
+  footerLinkButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    ...(WEB_POINTER || {}),
+  },
+  footerLinkText: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 13,
+    color: COLORS.inkMuted,
+    textDecorationLine: "underline",
   },
 });

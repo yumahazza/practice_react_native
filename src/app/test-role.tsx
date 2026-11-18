@@ -8,6 +8,15 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  COLORS,
+  FONTS,
+  FONT_WEIGHTS,
+  RADIUS,
+  SPACING,
+  WEB_POINTER,
+} from "../constants/theme";
 import {
   runRoleTestSuite,
   TestCaseResult,
@@ -34,9 +43,9 @@ export default function TestRoleScreen() {
       const totalCount = results.length;
 
       if (passCount === totalCount) {
-        setSummary(`🎉 SEMUA PENGUJIAN BERHASIL (${passCount}/${totalCount} PASS)!`);
+        setSummary(`Semua pengujian berhasil (${passCount}/${totalCount} PASS).`);
       } else {
-        setSummary(`⚠️ PENGUJIAN SELESAI: ${passCount}/${totalCount} PASS.`);
+        setSummary(`Pengujian selesai: ${passCount}/${totalCount} PASS.`);
       }
     } catch (err: any) {
       setSummary(`Terjadi kesalahan saat pengujian: ${err?.message || err}`);
@@ -48,342 +57,436 @@ export default function TestRoleScreen() {
   const getStatusBadge = (status: TestCaseResult["status"]) => {
     switch (status) {
       case "PASS":
-        return <View style={[styles.badge, styles.passBadge]}><Text style={styles.badgeTextPass}>PASS</Text></View>;
+        return (
+          <View style={[styles.badge, styles.passBadge]}>
+            <Text style={styles.badgeTextPass}>PASS</Text>
+          </View>
+        );
       case "FAIL":
-        return <View style={[styles.badge, styles.failBadge]}><Text style={styles.badgeTextFail}>FAIL</Text></View>;
+        return (
+          <View style={[styles.badge, styles.failBadge]}>
+            <Text style={styles.badgeTextFail}>FAIL</Text>
+          </View>
+        );
       case "RUNNING":
         return (
           <View style={[styles.badge, styles.runningBadge]}>
-            <ActivityIndicator size="small" color="#2563eb" style={{ marginRight: 4 }} />
+            <ActivityIndicator
+              size="small"
+              color={COLORS.orangeInk}
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.badgeTextRunning}>RUNNING</Text>
           </View>
         );
       default:
-        return <View style={[styles.badge, styles.pendingBadge]}><Text style={styles.badgeTextPending}>PENDING</Text></View>;
+        return (
+          <View style={[styles.badge, styles.pendingBadge]}>
+            <Text style={styles.badgeTextPending}>PENDING</Text>
+          </View>
+        );
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Card */}
-      <View style={styles.headerCard}>
-        <Text style={styles.title}>Skenario Pengujian User Role</Text>
-        <Text style={styles.subtitle}>
-          Verifikasi Autentikasi Google vs Email/Password & Role Super Admin
-        </Text>
-
-        <View style={styles.metaBox}>
-          <Text style={styles.metaText}>
-            <Text style={{ fontWeight: "bold" }}>Email Target:</Text> {TEST_EMAIL}
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Group */}
+        <View style={styles.headerBlock}>
+          <Text style={styles.title}>Verifikasi Role Akun</Text>
+          <Text style={styles.subtitle}>
+            Memeriksa konsistensi UID dan role Super Admin antara Google Sign-In dan
+            Email/Password.
           </Text>
-          <Text style={styles.metaText}>
-            <Text style={{ fontWeight: "bold" }}>Password Uji:</Text> {TEST_PASSWORD}
-          </Text>
-          <Text style={styles.metaText}>
-            <Text style={{ fontWeight: "bold" }}>Ekspektasi:</Text> Kedua metode login masuk ke akun dengan UID yang sama dan memperoleh role{" "}
-            <Text style={{ color: "#d97706", fontWeight: "bold" }}>Super Admin</Text>.
-          </Text>
-        </View>
 
-        <Pressable
-          style={[styles.runButton, isRunning && styles.disabledButton]}
-          onPress={handleStartTesting}
-          disabled={isRunning}
-        >
-          {isRunning ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.runButtonText}>▶ Jalankan Semua Skenario Pengujian</Text>
-          )}
-        </Pressable>
-
-        {summary ? (
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryText}>{summary}</Text>
+          <View style={styles.metaBox}>
+            <Text style={styles.metaText}>
+              <Text style={styles.metaLabel}>Email Target: </Text>
+              {TEST_EMAIL}
+            </Text>
+            <Text style={styles.metaText}>
+              <Text style={styles.metaLabel}>Password Uji: </Text>
+              {TEST_PASSWORD}
+            </Text>
+            <Text style={styles.metaText}>
+              <Text style={styles.metaLabel}>Ekspektasi: </Text>
+              Kedua metode login menghasilkan UID identik dengan role{" "}
+              <Text style={styles.roleHighlight}>Super Admin</Text>.
+            </Text>
           </View>
-        ) : null}
-      </View>
 
-      {/* List Test Cases */}
-      {testResults.length > 0 && (
-        <View style={styles.testList}>
-          {testResults.map((tc) => (
-            <View key={tc.id} style={styles.testCard}>
-              <View style={styles.testCardHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.testId}>{tc.id}</Text>
-                  <Text style={styles.testTitle}>{tc.title}</Text>
-                </View>
-                {getStatusBadge(tc.status)}
-              </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.runButton,
+              pressed && !isRunning && styles.runButtonPressed,
+              isRunning && styles.disabledButton,
+            ]}
+            onPress={handleStartTesting}
+            disabled={isRunning}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isRunning, busy: isRunning }}
+          >
+            {isRunning ? (
+              <ActivityIndicator color={COLORS.ink} size="small" />
+            ) : (
+              <Text style={styles.runButtonText}>Jalankan Pengujian</Text>
+            )}
+          </Pressable>
 
-              <Text style={styles.testDesc}>{tc.description}</Text>
-
-              <View style={styles.resultBlock}>
-                <Text style={styles.label}>Ekspektasi:</Text>
-                <Text style={styles.valExpected}>{tc.expected}</Text>
-              </View>
-
-              <View style={styles.resultBlock}>
-                <Text style={styles.label}>Hasil Aktual:</Text>
-                <Text
-                  style={[
-                    styles.valActual,
-                    tc.status === "PASS" ? styles.textPass : tc.status === "FAIL" ? styles.textFail : null,
-                  ]}
-                >
-                  {tc.actual}
-                </Text>
-              </View>
-
-              {tc.details && tc.details.length > 0 && (
-                <View style={styles.detailsBlock}>
-                  <Text style={styles.detailsTitle}>Detail Verifikasi:</Text>
-                  {tc.details.map((item, idx) => (
-                    <Text key={idx} style={styles.detailItem}>• {item}</Text>
-                  ))}
-                </View>
-              )}
+          {summary ? (
+            <View style={styles.summaryBox} accessibilityLiveRegion="polite">
+              <Text style={styles.summaryText}>{summary}</Text>
             </View>
-          ))}
+          ) : null}
         </View>
-      )}
 
-      {/* Navigation Buttons */}
-      <View style={styles.navButtons}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.replace("/home" as any)}
-        >
-          <Text style={styles.backButtonText}>Ke Halaman Home (Portal)</Text>
-        </Pressable>
-        <Pressable
-          style={styles.backLoginButton}
-          onPress={() => router.replace("/" as any)}
-        >
-          <Text style={styles.backLoginButtonText}>Ke Halaman Login</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        {/* List Test Cases */}
+        {testResults.length > 0 && (
+          <View style={styles.testList}>
+            {testResults.map((tc) => (
+              <View key={tc.id} style={styles.testRow}>
+                <View style={styles.testCardHeader}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.testId}>{tc.id}</Text>
+                    <Text style={styles.testTitle}>{tc.title}</Text>
+                  </View>
+                  {getStatusBadge(tc.status)}
+                </View>
+
+                <Text style={styles.testDesc}>{tc.description}</Text>
+
+                <View style={styles.resultBlock}>
+                  <Text style={styles.label}>Ekspektasi</Text>
+                  <Text style={styles.valExpected}>{tc.expected}</Text>
+                </View>
+
+                <View style={styles.resultBlock}>
+                  <Text style={styles.label}>Hasil Aktual</Text>
+                  <Text
+                    style={[
+                      styles.valActual,
+                      tc.status === "PASS"
+                        ? styles.textPass
+                        : tc.status === "FAIL"
+                        ? styles.textFail
+                        : null,
+                    ]}
+                  >
+                    {tc.actual}
+                  </Text>
+                </View>
+
+                {tc.details && tc.details.length > 0 && (
+                  <View style={styles.detailsBlock}>
+                    {tc.details.map((item, idx) => (
+                      <Text key={idx} style={styles.detailItem}>
+                        - {item}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Navigation Buttons */}
+        <View style={styles.navButtons}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.backButtonPressed,
+            ]}
+            onPress={() => router.replace("/home" as any)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.backButtonText}>Kembali ke Beranda</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.backLoginButton,
+              pressed && styles.backLoginButtonPressed,
+            ]}
+            onPress={() => router.replace("/" as any)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.backLoginButtonText}>Ke Halaman Sign In</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f1f5f9",
   },
   content: {
-    padding: 16,
-    maxWidth: 700,
+    padding: SPACING.lg,
+    maxWidth: 640,
     width: "100%",
     alignSelf: "center",
   },
-  headerCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginBottom: 16,
+  headerBlock: {
+    marginBottom: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#0f172a",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.bold,
+    fontSize: 22,
+    lineHeight: 28,
+    color: COLORS.ink,
     marginBottom: 4,
   },
   subtitle: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
-    color: "#64748b",
-    marginBottom: 14,
+    lineHeight: 20,
+    color: COLORS.inkMuted,
+    marginBottom: SPACING.md,
   },
   metaBox: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: COLORS.border,
     gap: 6,
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   metaText: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
-    color: "#334155",
-    lineHeight: 18,
+    color: COLORS.ink,
+    lineHeight: 19,
+  },
+  metaLabel: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.ink,
+  },
+  roleHighlight: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.orangeInk,
   },
   runButton: {
-    backgroundColor: "#2563eb",
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    minHeight: 48,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
     alignItems: "center",
+    ...(WEB_POINTER || {}),
+  },
+  runButtonPressed: {
+    backgroundColor: COLORS.primaryPressed,
   },
   disabledButton: {
-    opacity: 0.6,
+    opacity: 0.65,
   },
   runButtonText: {
-    color: "#ffffff",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.ink,
     fontSize: 15,
-    fontWeight: "bold",
   },
   summaryBox: {
-    marginTop: 14,
+    marginTop: SPACING.md,
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#ecfdf5",
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.primarySurface,
     borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderColor: COLORS.primary,
   },
   summaryText: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#065f46",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    fontSize: 13,
+    color: COLORS.primaryInk,
     textAlign: "center",
   },
   testList: {
-    gap: 12,
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
-  testCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+  testRow: {
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   testCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   testId: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#64748b",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    fontSize: 11,
+    color: COLORS.inkMuted,
   },
   testTitle: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 15,
-    fontWeight: "bold",
-    color: "#0f172a",
+    color: COLORS.ink,
     marginTop: 2,
   },
   testDesc: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 13,
-    color: "#475569",
-    marginBottom: 10,
+    lineHeight: 19,
+    color: COLORS.inkMuted,
+    marginBottom: 8,
   },
   resultBlock: {
     marginTop: 6,
   },
   label: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
     fontSize: 11,
-    fontWeight: "bold",
-    color: "#64748b",
+    color: COLORS.inkMuted,
     textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   valExpected: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
     fontSize: 12,
-    color: "#334155",
+    lineHeight: 18,
+    color: COLORS.ink,
     marginTop: 2,
   },
   valActual: {
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
     fontSize: 12,
-    color: "#334155",
+    lineHeight: 18,
+    color: COLORS.ink,
     marginTop: 2,
-    fontWeight: "500",
   },
   textPass: {
-    color: "#16a34a",
+    color: COLORS.primaryInk,
   },
   textFail: {
-    color: "#dc2626",
+    color: COLORS.coralInk,
   },
   detailsBlock: {
-    backgroundColor: "#f8fafc",
-    padding: 8,
-    borderRadius: 6,
+    backgroundColor: COLORS.surface,
+    padding: 10,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     marginTop: 8,
-  },
-  detailsTitle: {
-    fontSize: 11,
-    fontWeight: "bold",
-    color: "#475569",
-    marginBottom: 4,
+    gap: 2,
   },
   detailItem: {
-    fontSize: 11,
-    color: "#334155",
-    lineHeight: 16,
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.regular,
+    fontSize: 12,
+    color: COLORS.inkMuted,
+    lineHeight: 18,
   },
   badge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: RADIUS.sm,
   },
   passBadge: {
-    backgroundColor: "#dcfce7",
+    backgroundColor: COLORS.primarySurface,
   },
   badgeTextPass: {
-    color: "#15803d",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.primaryInk,
     fontSize: 11,
-    fontWeight: "bold",
   },
   failBadge: {
-    backgroundColor: "#fee2e2",
+    backgroundColor: COLORS.coralSurface,
   },
   badgeTextFail: {
-    color: "#b91c1c",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.coralInk,
     fontSize: 11,
-    fontWeight: "bold",
   },
   runningBadge: {
-    backgroundColor: "#dbeafe",
+    backgroundColor: COLORS.orangeSurface,
   },
   badgeTextRunning: {
-    color: "#1d4ed8",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.orangeInk,
     fontSize: 11,
-    fontWeight: "bold",
   },
   pendingBadge: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: COLORS.surface,
   },
   badgeTextPending: {
-    color: "#64748b",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.inkMuted,
     fontSize: 11,
-    fontWeight: "bold",
   },
   navButtons: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 30,
+    marginBottom: SPACING.xl,
   },
   backButton: {
     flex: 1,
-    backgroundColor: "#0f172a",
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.ink,
+    minHeight: 46,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
     alignItems: "center",
+    ...(WEB_POINTER || {}),
+  },
+  backButtonPressed: {
+    opacity: 0.88,
   },
   backButtonText: {
-    color: "#ffffff",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.background,
     fontSize: 13,
-    fontWeight: "bold",
   },
   backLoginButton: {
     flex: 1,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderStrong,
+    minHeight: 46,
+    borderRadius: RADIUS.sm,
+    justifyContent: "center",
     alignItems: "center",
+    ...(WEB_POINTER || {}),
+  },
+  backLoginButtonPressed: {
+    backgroundColor: COLORS.surfacePressed,
   },
   backLoginButtonText: {
-    color: "#334155",
+    fontFamily: FONTS.family,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.ink,
     fontSize: 13,
-    fontWeight: "bold",
   },
 });

@@ -1,10 +1,52 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db, isFirebaseConfigured } from "../config/firebaseConfig";
+import { COLORS } from "../constants/theme";
 import { UserProfile, UserRole } from "../types";
 
 const USERS_COLLECTION = "users";
 const USER_CACHE_PREFIX = "@user_profile_";
+
+const CANONICAL_USERNAMES: Record<string, string> = {
+  "yumatamahazza@gmail.com": "yumahazza",
+  "yumahazza@portal.local": "yumahazza",
+  "yumatamahazza@portal.local": "yumahazza",
+  yumatamahazza: "yumahazza",
+  "yuma hazza yuditama": "yumahazza",
+};
+
+/**
+ * Menyeragamkan username/displayName agar konsisten antara login Google dan Email/Password.
+ */
+export function resolveCanonicalUsername(
+  email?: string | null,
+  candidateName?: string | null,
+  existingName?: string | null
+): string {
+  const normalizedEmail = (email || "").toLowerCase().trim();
+  if (normalizedEmail && CANONICAL_USERNAMES[normalizedEmail]) {
+    return CANONICAL_USERNAMES[normalizedEmail];
+  }
+
+  for (const rawName of [candidateName, existingName]) {
+    const clean = (rawName || "").trim();
+    if (clean && CANONICAL_USERNAMES[clean.toLowerCase()]) {
+      return CANONICAL_USERNAMES[clean.toLowerCase()];
+    }
+  }
+
+  const cleanExisting = (existingName || "").trim();
+  if (cleanExisting) {
+    return cleanExisting;
+  }
+
+  const cleanCandidate = (candidateName || "").trim();
+  if (cleanCandidate) {
+    return cleanCandidate;
+  }
+
+  return normalizedEmail.split("@")[0] || "Mahasiswa";
+}
 
 /**
  * Membuat kunci unik yang aman berdasarkan alamat email untuk pencocokan akun tunggal.
@@ -72,7 +114,11 @@ export async function syncUserProfile(
   const resolvedProfile: UserProfile = {
     uid: canonicalUid,
     email: normalizedEmail,
-    displayName: displayName || existingProfile?.displayName || normalizedEmail.split("@")[0],
+    displayName: resolveCanonicalUsername(
+      normalizedEmail,
+      displayName,
+      existingProfile?.displayName
+    ),
     photoURL: photoURL || existingProfile?.photoURL || null,
     providerId: providerId,
     role: assignedRole,
@@ -115,6 +161,6 @@ export function getRolePermissions(role?: UserRole | string) {
     canManageRoles: isSuperAdmin,
     canAccessSystemSettings: isSuperAdmin,
     canRunTestSuite: true,
-    badgeColor: isSuperAdmin ? "#d97706" : "#2563eb",
+    badgeColor: isSuperAdmin ? COLORS.orange : COLORS.primary,
   };
 }
