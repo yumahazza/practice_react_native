@@ -11,14 +11,12 @@ import {
   WEB_POINTER,
   retroOffset,
 } from "../constants/theme";
-import { clearAuthSession } from "../services/authStorage";
+import { clearAuthSession, clearAuthSessionSyncWeb } from "../services/authStorage";
 import { UserProfile } from "../types";
 
 export function executeLogout(onNativeNavigate: () => void) {
   try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.clear();
-    }
+    clearAuthSessionSyncWeb();
   } catch {}
 
   clearAuthSession().catch(() => {});

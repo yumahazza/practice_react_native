@@ -8,6 +8,9 @@ export interface UserProfile {
   providerId?: string;
   role?: UserRole;
   linkedProviders?: string[];
+  googleDisplayName?: string | null;
+  aliases?: string[];
+  hasFirebasePassword?: boolean;
 }
 
 export interface AuthSession {

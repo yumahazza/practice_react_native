@@ -15,6 +15,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import {
   GoogleAuthProvider,
+  fetchSignInMethodsForEmail,
   getRedirectResult,
   signInWithCredential,
   signInWithEmailAndPassword,
@@ -33,7 +34,11 @@ import {
   retroOffset,
 } from "../constants/theme";
 import { getAuthSession, saveAuthSession } from "../services/authStorage";
-import { syncUserProfile } from "../services/userService";
+import {
+  getUserProfileByEmail,
+  resolveLoginIdentity,
+  syncUserProfile,
+} from "../services/userService";
 
 const ENABLE_AUTO_BYPASS = true;
 
@@ -41,6 +46,37 @@ WebBrowser.maybeCompleteAuthSession();
 
 type ActiveField = "username" | "password" | null;
 type AuthAction = "manual" | "google" | null;
+
+async function completeGoogleSignIn(
+  firebaseUser: {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    providerData?: { email?: string | null; displayName?: string | null }[];
+    getIdToken: () => Promise<string>;
+  },
+  tokenOverride?: string
+) {
+  const idToken = tokenOverride || (await firebaseUser.getIdToken());
+  const googleEmail =
+    firebaseUser.email || firebaseUser.providerData?.[0]?.email || null;
+  const googleName =
+    firebaseUser.displayName ||
+    firebaseUser.providerData?.[0]?.displayName ||
+    "Pengguna Google";
+
+  const profile = await syncUserProfile(
+    firebaseUser.uid,
+    googleEmail,
+    googleName,
+    firebaseUser.photoURL,
+    "google.com"
+  );
+
+  await saveAuthSession(idToken, profile);
+  return profile;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -76,16 +112,7 @@ export default function LoginPage() {
         try {
           const redirectRes = await getRedirectResult(auth);
           if (redirectRes && redirectRes.user) {
-            const firebaseUser = redirectRes.user;
-            const idToken = await firebaseUser.getIdToken();
-            const profile = await syncUserProfile(
-              firebaseUser.uid,
-              firebaseUser.email,
-              firebaseUser.displayName || "Pengguna Google",
-              firebaseUser.photoURL,
-              "google.com"
-            );
-            await saveAuthSession(idToken, profile);
+            await completeGoogleSignIn(redirectRes.user);
             if (isMounted) {
               router.replace("/home" as any);
             }
@@ -175,15 +202,25 @@ export default function LoginPage() {
     try {
       const cleanInput = username.trim();
       const isEmailInput = cleanInput.includes("@");
-      const normalizedEmail = isEmailInput
-        ? cleanInput.toLowerCase()
-        : `${cleanInput.toLowerCase().replace(/[^a-z0-9._-]/g, "") || "user"}@portal.local`;
+      const resolution = await resolveLoginIdentity(cleanInput);
+      const normalizedEmail = resolution.email;
+      const shouldTryFirebaseAuth =
+        isEmailInput ||
+        resolution.matchedFromDirectory ||
+        !resolution.isSyntheticLocal;
 
-      let uid = "usr-" + normalizedEmail.replace(/[^a-z0-9]/g, "").slice(0, 16);
-      let displayName: string | null = isEmailInput ? null : cleanInput;
+      const existingProfile = await getUserProfileByEmail(normalizedEmail);
+
+      let uid =
+        existingProfile?.uid ||
+        "usr-" + normalizedEmail.replace(/[^a-z0-9]/g, "").slice(0, 16);
+      let displayName: string | null = isEmailInput
+        ? existingProfile?.displayName || null
+        : cleanInput;
       let idToken = "session-token-" + Date.now();
+      let signedInWithFirebasePassword = false;
 
-      if (isEmailInput) {
+      if (shouldTryFirebaseAuth) {
         try {
           const userCredential = await signInWithEmailAndPassword(
             auth,
@@ -191,10 +228,52 @@ export default function LoginPage() {
             password
           );
           uid = userCredential.user.uid;
-          displayName = userCredential.user.displayName || null;
+          displayName = userCredential.user.displayName || displayName;
           idToken = await userCredential.user.getIdToken();
-        } catch {
-          // Lanjutkan sesi simulasi/lokal apabila kredensial lokal atau offline
+          signedInWithFirebasePassword = true;
+        } catch (firebaseErr: any) {
+          const errorCode = firebaseErr?.code || "";
+
+          if (errorCode === "auth/wrong-password") {
+            throw new Error("Password yang Anda masukkan salah.");
+          }
+          if (errorCode === "auth/too-many-requests") {
+            throw new Error(
+              "Terlalu banyak percobaan login gagal. Silakan coba lagi beberapa saat."
+            );
+          }
+          if (errorCode === "auth/user-disabled") {
+            throw new Error("Akun ini dinonaktifkan oleh administrator.");
+          }
+          if (errorCode === "auth/invalid-email") {
+            throw new Error("Format username atau email tidak valid.");
+          }
+
+          if (errorCode === "auth/invalid-credential") {
+            let hasConfirmedPassword = Boolean(
+              existingProfile?.hasFirebasePassword
+            );
+            if (!hasConfirmedPassword) {
+              try {
+                const methods = await fetchSignInMethodsForEmail(
+                  auth,
+                  normalizedEmail
+                );
+                if (methods.includes("password")) {
+                  hasConfirmedPassword = true;
+                }
+              } catch {
+                // Abaikan jika tidak dapat memeriksa provider Firebase
+              }
+            }
+
+            if (hasConfirmedPassword) {
+              throw new Error(
+                "Password tidak sesuai untuk akun tersebut. Periksa kembali password Anda."
+              );
+            }
+          }
+          // Lanjutkan sesi terpadu apabila akun hanya terhubung dengan Google / mode lokal / offline
         }
       }
 
@@ -202,8 +281,9 @@ export default function LoginPage() {
         uid,
         normalizedEmail,
         displayName,
-        null,
-        "password"
+        existingProfile?.photoURL || null,
+        "password",
+        signedInWithFirebasePassword ? { hasFirebasePassword: true } : undefined
       );
 
       await saveAuthSession(idToken, profile);
@@ -234,18 +314,7 @@ export default function LoginPage() {
 
         try {
           const result = await signInWithPopup(auth, provider);
-          const firebaseUser = result.user;
-          const idToken = await firebaseUser.getIdToken();
-
-          const profile = await syncUserProfile(
-            firebaseUser.uid,
-            firebaseUser.email,
-            firebaseUser.displayName || "Pengguna Google",
-            firebaseUser.photoURL,
-            "google.com"
-          );
-
-          await saveAuthSession(idToken, profile);
+          await completeGoogleSignIn(result.user);
           router.replace("/home" as any);
         } catch (popupErr: any) {
           if (popupErr?.code === "auth/popup-blocked") {
@@ -275,17 +344,7 @@ export default function LoginPage() {
 
           const credential = GoogleAuthProvider.credential(idToken);
           const userCredential = await signInWithCredential(auth, credential);
-          const firebaseUser = userCredential.user;
-
-          const profile = await syncUserProfile(
-            firebaseUser.uid,
-            firebaseUser.email,
-            firebaseUser.displayName || "Pengguna Google",
-            firebaseUser.photoURL,
-            "google.com"
-          );
-
-          await saveAuthSession(idToken, profile);
+          await completeGoogleSignIn(userCredential.user, idToken);
           router.replace("/home" as any);
         } else if (response.type === "error") {
           setAuthError("Autentikasi Google gagal dijalankan.");

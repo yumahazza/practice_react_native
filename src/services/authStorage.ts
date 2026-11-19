@@ -1,6 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { UserProfile, AuthSession } from "../types";
-import { resolveCanonicalUsername, resolveUserRole } from "./userService";
+import {
+  normalizeCanonicalEmail,
+  resolveCanonicalUsername,
+  resolveUserRole,
+} from "./userService";
 
 export const TOKEN_KEY = "@firebase_login_token";
 export const USER_KEY = "@firebase_login_user";
@@ -112,14 +116,17 @@ export async function getAuthSession(): Promise<AuthSession> {
       return { token: null, user: null };
     }
 
+    const resolvedEmail =
+      normalizeCanonicalEmail(user.email, user.displayName) || user.email;
     const resolvedDisplayName = resolveCanonicalUsername(
-      user.email,
+      resolvedEmail,
       user.displayName
     );
     const normalizedUser: UserProfile = {
       ...user,
+      email: resolvedEmail,
       displayName: resolvedDisplayName,
-      role: resolveUserRole(user.email, resolvedDisplayName, user.role),
+      role: resolveUserRole(resolvedEmail, resolvedDisplayName, user.role),
     };
 
     return { token, user: normalizedUser };
@@ -130,27 +137,40 @@ export async function getAuthSession(): Promise<AuthSession> {
 }
 
 /**
+ * Menghapus kunci sesi autentikasi di localStorage Web secara sinkron saat Logout
+ * tanpa menghapus direktori identitas pengguna atau data lokal mahasiswa.
+ */
+export function clearAuthSessionSyncWeb(): void {
+  if (typeof window === "undefined" || !window.localStorage) return;
+
+  ALL_KEYS.forEach((key) => {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {}
+  });
+
+  try {
+    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+      const k = window.localStorage.key(i);
+      if (
+        k &&
+        (k.startsWith("@firebase") ||
+          k.startsWith("firebase:authUser") ||
+          k.includes("token"))
+      ) {
+        window.localStorage.removeItem(k);
+      }
+    }
+  } catch {}
+}
+
+/**
  * Menghapus token dan data login saat Logout.
  */
 export async function clearAuthSession(): Promise<void> {
   try {
-    // 1. Bersihkan dari window.localStorage Web secara menyeluruh
-    if (typeof window !== "undefined" && window.localStorage) {
-      ALL_KEYS.forEach((key) => {
-        try {
-          window.localStorage.removeItem(key);
-        } catch (_) {}
-      });
-      // Bersihkan juga sisa key firebase auth
-      try {
-        for (let i = window.localStorage.length - 1; i >= 0; i--) {
-          const k = window.localStorage.key(i);
-          if (k && (k.startsWith("@firebase") || k.startsWith("firebase:authUser") || k.includes("token"))) {
-            window.localStorage.removeItem(k);
-          }
-        }
-      } catch (_) {}
-    }
+    // 1. Bersihkan dari window.localStorage Web secara aman (pertahankan direktori user & cache non-sesi)
+    clearAuthSessionSyncWeb();
 
     // 2. Bersihkan dari AsyncStorage
     await AsyncStorage.multiRemove(ALL_KEYS);
@@ -160,7 +180,7 @@ export async function clearAuthSession(): Promise<void> {
       ALL_KEYS.forEach((key) => {
         try {
           mmkvStorage.delete(key);
-        } catch (_) {}
+        } catch {}
       });
     }
 
